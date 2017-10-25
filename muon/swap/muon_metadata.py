@@ -1,10 +1,13 @@
+#!/usr/bin/env python
 
 from swap.db import DB
+import swap.config
 
 import argparse
 import csv
 import json
 import re
+import os
 
 import logging
 logger = logging.getLogger(__name__)
@@ -12,11 +15,26 @@ logger = logging.getLogger(__name__)
 parse = re.compile('run([0-9]+)_evt([0-9]+).jpeg')
 
 
+def get_path():
+    p = os.path
+    path = p.dirname(p.abspath(__name__))
+    return path
+
+
+def swap_config(config):
+    swap.config.import_config(config)
+    swap.config.logger.init()
+
+
 def options(parser):
+    parser.add_argument('config', help='Muon Hunters swap config file')
     parser.add_argument('file', help='subject csv dump')
 
 
 def run(args):
+    config_file = args.config[0]
+    swap_config(config_file)
+
     fname = args.file[0]
     data = get_metadata(fname)
     upload_data(data)
