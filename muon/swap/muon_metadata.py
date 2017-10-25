@@ -72,3 +72,14 @@ def parse_row(row):
 def parse_fname(fname):
     run_, evt = parse.match(fname).groups()
     return run_, evt
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    options(parser)
+    args = parser.parse_args()
+    run(args)
+
+
+if __name__ == '__main__':
+    main()
