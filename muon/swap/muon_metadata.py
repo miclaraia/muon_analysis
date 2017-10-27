@@ -74,8 +74,10 @@ def get_metadata(fname):
 def parse_row(row):
     meta = json.loads(row['metadata'])
 
-    subject = row['subject_id']
+    subject = int(row['subject_id'])
     fname = meta['Filename']
+
+    print('subject %d fname %s' % (subject, fname))
 
     run_, evt = parse_fname(fname)
 
@@ -88,7 +90,9 @@ def parse_row(row):
 
 
 def parse_fname(fname):
-    run_, evt = parse.match(fname).groups()
+    run_, evt = parse.search(fname).groups()
+    run_ = int(run_)
+    evt = int(evt)
     return run_, evt
 
 
