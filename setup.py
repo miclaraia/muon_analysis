@@ -115,7 +115,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'run_swap=swap.__main__:main',
+            'muon=muon.__main__:main',
         ],
     },
 )
