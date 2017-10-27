@@ -102,7 +102,7 @@ if __name__ == '__main__':
     #####   Interface   ###################################################
     #######################################################################
 
-class Interface(ui.Interface):
+class Interface(ui.UI, metaclass=ui.MetaInterface):
     command = 'metadata'
 
     def options(self, parser):
@@ -112,7 +112,6 @@ class Interface(ui.Interface):
     @staticmethod
     def call(args):
         config_file = args.config
-        print(args)
         swap_config(config_file)
 
         fname = args.file
