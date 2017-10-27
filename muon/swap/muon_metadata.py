@@ -2,6 +2,7 @@
 
 from swap.db import DB
 import swap.config
+from muon.ui import ui
 
 import argparse
 import csv
@@ -26,26 +27,13 @@ def swap_config(config):
     swap.config.logger.init()
 
 
-def options(parser):
-    parser.add_argument('config', help='Muon Hunters swap config file')
-    parser.add_argument('file', help='subject csv dump')
-
-
-def run(args):
-    config_file = args.config[0]
-    swap_config(config_file)
-
-    fname = args.file[0]
-    data = get_metadata(fname)
-    upload_data(data)
-
-
 def upload_data(data):
     db = DB()
     requests = []
 
     def write():
         nonlocal requests
+        print('writing')
         if len(requests) > 0:
             db.subjects.bulk_write(requests)
             requests = []
@@ -86,6 +74,8 @@ def parse_row(row):
         'event': evt,
     }
 
+    print(metadata)
+
     return subject, metadata
 
 
@@ -98,10 +88,33 @@ def parse_fname(fname):
 
 def main():
     parser = argparse.ArgumentParser()
-    options(parser)
+    interface = Interface()
+
+    interface.options(parser)
     args = parser.parse_args()
-    run(args)
+    interface.call(args)
 
 
 if __name__ == '__main__':
     main()
+
+    #######################################################################
+    #####   Interface   ###################################################
+    #######################################################################
+
+class Interface(ui.Interface):
+    command = 'metadata'
+
+    def options(self, parser):
+        parser.add_argument('config', help='Muon Hunters swap config file')
+        parser.add_argument('file', help='subject csv dump')
+
+    @staticmethod
+    def call(args):
+        config_file = args.config
+        print(args)
+        swap_config(config_file)
+
+        fname = args.file
+        data = get_metadata(fname)
+        upload_data(data)
