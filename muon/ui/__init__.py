@@ -1,6 +1,6 @@
 
 import muon.ui.ui
-import muon.ui.test
+import muon.ui.camera
 
 def run():
     muon.ui.ui.cli()
