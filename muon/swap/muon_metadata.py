@@ -9,10 +9,10 @@ import csv
 import json
 import re
 import os
+import sys
 
 import logging
 logger = logging.getLogger(__name__)
-
 
 
 def swap_config(config):
@@ -40,12 +40,20 @@ class MuonMetadata:
                 db.subjects.bulk_write(requests)
                 requests = []
 
+        i = 0
+        print(i)
         for subject, metadata in data.items():
             r = db.subjects.update_metadata(subject, metadata, False)
             requests.append(r)
 
-            if len(requests) > 1e4:
+            if i % 10000:
+                sys.stdout.flush()
+                sys.stdout.write('%d\r' % i)
+            if len(requests) > 1e5:
                 write()
+                requests = []
+
+            i += 1
         write()
 
 
