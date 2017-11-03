@@ -87,6 +87,7 @@ setup(
         'numpy',
         'pylint',
         'sklearn',
+        'scipy',
     ],
 
     # List additional groups of dependencies here (e.g. development
