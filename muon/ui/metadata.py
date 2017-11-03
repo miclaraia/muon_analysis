@@ -13,17 +13,15 @@ def meta():
 
 
 @meta.command()
-@click.argument('config', nargs=1)
 @click.argument('file', nargs=1)
-def subject_id(config, file):
-    mm.SubjectID.run(config, file)
+def subject_id(file):
+    mm.SubjectID.run(file)
 
 
 @meta.command()
-@click.argument('config', nargs=1)
 @click.argument('file', nargs=1)
-def test_regex(config, file):
-    mm.SubjectID.test_regex(config, file)
+def test_regex(file):
+    mm.SubjectID.test_regex(file)
 
 @meta.command()
 def regex():

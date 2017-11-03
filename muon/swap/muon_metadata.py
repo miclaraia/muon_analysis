@@ -15,17 +15,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def swap_config(config):
-    swap.config.import_config(config)
-    swap.config.logger.init()
-
-
-def get_path():
-    p = os.path
-    path = p.dirname(p.abspath(__name__))
-    return path
-
-
 class MuonMetadata:
 
     @staticmethod
@@ -64,16 +53,12 @@ class SubjectID(MuonMetadata):
     ]))
 
     @classmethod
-    def run(cls, config_file, fname):
-        swap_config(config_file)
-
+    def run(cls, fname):
         data = cls.collect_data(fname)
         cls.upload_data(data)
 
     @classmethod
-    def test_regex(cls, config_file, fname):
-        swap_config(config_file)
-
+    def test_regex(cls, fname):
         subjects = {}
         evts = {}
         for subject, evt in cls.get_data(fname):
