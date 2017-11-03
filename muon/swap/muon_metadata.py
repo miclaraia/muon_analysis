@@ -52,7 +52,7 @@ class MuonMetadata:
 class SubjectID(MuonMetadata):
 
     regex = re.compile('|'.join([
-        '[a-z_]*(?:run)?([0-9]+)[a-z_]*evt([0-9]+)(?:_tel[0-9])?.jpeg',
+        '[a-z_]*(?:run)?([0-9]+)[a-z_]*evt([0-9]+)(?:_tel([0-9]))?.jpeg',
     ]))
 
     @classmethod
@@ -66,8 +66,27 @@ class SubjectID(MuonMetadata):
     def test_regex(cls, config_file, fname):
         swap_config(config_file)
 
-        for i in cls.get_data(fname):
-            pass
+        subjects = {}
+        evts = {}
+        for subject, evt in cls.get_data(fname):
+            if subject not in subjects:
+                subjects[subject] = [evt]
+            else:
+                subjects[subject].append(evt)
+
+            if evt not in evts:
+                evts[evt] = [subject]
+            else:
+                evts[evt].append(subject)
+
+        subjects = {k:v for k, v in subjects.items() if len(v) > 1}
+        evts = {k:v for k, v in evts.items() if len(v) > 1}
+        from pprint import pprint
+        pprint(subjects)
+        pprint(evts)
+
+        print('subjects %d evts %d' % (len(subjects), len(evts)))
+
 
     ###########################################################################
     #####   ###################################################################
@@ -76,8 +95,14 @@ class SubjectID(MuonMetadata):
     @classmethod
     def collect_data(cls, fname):
         data = {}
-        for subject, run, evt in cls.get_data(fname):
-            data[subject] = (run, evt)
+        for subject, evt in cls.get_data(fname):
+            metadata = {
+                'run': evt[0],
+                'evt': evt[1],
+                'tel': evt[2],
+            }
+            if subject not in data:
+                data[subject] = metadata
 
         return data
 
@@ -98,7 +123,7 @@ class SubjectID(MuonMetadata):
         # random exception where the filename wasn't encoded into the
         # subject dump. I think this subject is the only exception
         if subject == 6396050:
-            return (subject, 78596, 275237)
+            return (subject, (78596, 275237, -1))
 
         fname = None
         for value in meta.values():
@@ -109,11 +134,11 @@ class SubjectID(MuonMetadata):
             print(meta)
             raise Exception('Couldn\'t find filename in meta field')
 
-        print('subject %d fname %s' % (subject, fname))
+        # print('subject %d fname %s' % (subject, fname))
 
-        run_, evt = cls.parse_fname(fname)
+        evt = cls.parse_fname(fname)
 
-        metadata = subject, run_, evt
+        metadata = subject, evt
         print(metadata)
 
         return metadata
@@ -124,7 +149,13 @@ class SubjectID(MuonMetadata):
         if not m:
             print(fname)
             raise Exception
-        run_, evt = m.groups()
+        run_, evt, tel = m.groups()
         run_ = int(run_)
         evt = int(evt)
-        return run_, evt
+
+        if tel is None:
+            tel = -1
+        else:
+            tel = int(tel)
+        return run_, evt, tel
+
