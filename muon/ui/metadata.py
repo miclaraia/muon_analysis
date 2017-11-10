@@ -6,6 +6,7 @@ import swap.config
 
 import click
 import code
+import pickle
 
 @ui.cli.group()
 def meta():
@@ -61,5 +62,9 @@ def pca(path):
 
     hdf5.Cluster.run(subjects)
 
+@hdf.command()
+@click.argument('path', nargs=1)
+def load(path):
+    pickle.load(path)
 
-
+    code.interact(local=locals())
