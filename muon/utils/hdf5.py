@@ -153,23 +153,138 @@ class Subjects:
 
 class Cluster:
 
+    figure = 0
+
+    def __init__(self, pca, subjects, sample):
+        self.pca = pca
+        self.subjects = subjects
+        self.sample_X = self.project_subjects(sample)
+
+    def plot(self, save=False):
+        subject_order, X = self.sample_X
+        data = {k:[] for k in [-1, 0, 1]}
+        for i, s in enumerate(subject_order):
+            x, y = X[i]
+            label = self.subjects[s].label
+            c = self.color(label)
+            data[label].append((x, y, c))
+
+        def plot(v):
+            x, y, c = zip(*data[v])
+            plt.scatter(x, y, c=c, s=2.5)
+
+        for i in [-1, 0, 1]:
+            plot(i)
+
+        plt.title('PCA dimensionality reduction of Muon Data')
+        plt.xlabel('Principle Component 1')
+        plt.ylabel('Principle Component 2')
+
+        # c = [s.label for s in subjects]
+        if save:
+            plt.savefig('Figure_%d' % self.figure)
+            self.figure += 1
+        else:
+            plt.show()
+
+    def download_plotted_subjects(self, x, y, c, size, prefix='', dir_=None):
+        subjects = self.subjects_in_range(x, y, c, self.sample_X[0])
+        self.download_subjects(subjects, size, prefix, dir_)
+
+    def subjects_in_range(self, x, y, c, subjects=None):
+        if subjects is None:
+            subjects = list(self.subjects.keys())
+
+        # Remap bounding box coordinates so name doesn't conflict
+        x_ = x
+        y_ = y
+
+        if type(c) is int:
+            c = [c]
+
+        def in_range(x, y):
+            """
+            Check if coordinates are inside the bounding box
+            """
+            def check(x, bounds):
+                if bounds is None:
+                    return True
+
+                min, max = bounds
+                if x > min and x < max:
+                    return True
+                return False
+
+            return check(x, x_) and check(y, y_)
+
+        def check_type(subject):
+            """
+            Check if subject is in the required class
+            """
+            if c is None:
+                return True
+            subject = self.subjects[subject]
+            return subject.label in c
+
+        order, X = self.project_subjects(subjects)
+        subjects = []
+        for i, point in enumerate(X):
+            x, y = point
+            if in_range(x, y):
+                subject = order[i]
+                if check_type(subject):
+                    subjects.append(subject)
+
+        return subjects
+
+    def download_subjects(self, subjects, size=None, prefix='', dir_=None):
+        """
+        Download subject images from panoptes
+
+        subjects: list of subject ids
+        size: select random sample from list of subjects
+        """
+        if size is not None:
+            subjects = random.sample(subjects, size)
+        muon.utils.subjects.download_images(subjects, prefix, dir_)
+
+    @staticmethod
+    def color(value):
+        if value == -1:
+            return (.8, .8, .8)
+        elif value == 0:
+            return (.1, .1, .8)
+        return (.9, .1, .1)
+
     @classmethod
     def run(cls, subjects):
-        subjects = subjects.get_sample(10000)
-        order, charges = cls.build_charge_array(subjects)
+        _subjects = list(subjects.subjects.values())
+        _, charges = cls.build_charge_array(_subjects)
 
         pca = PCA(n_components=2)
-        X = pca.fit_transform(charges)
-        print(X)
+        pca.fit(charges)
 
-        x, y = zip(*X)
-        c = [s.label for s in subjects]
-        plt.scatter(x, y, c=c, s=2.5)
-        plt.show()
+
+        sample = subjects.get_sample(1e4)
+        cluster = cls(pca, subjects, sample)
+        cluster.plot()
+
+
+        import code
+        code.interact(local=locals())
 
     @staticmethod
     def get_charge(subject):
         return np.array(subject.charge)
+
+    def project_subjects(self, subjects):
+        """
+        subjects: list of subject id's to project
+        """
+        subjects = [self.subjects[s] for s in subjects]
+        order, charges = self.build_charge_array(subjects)
+        X = self.pca.transform(charges)
+        return order, X
 
     @classmethod
     def build_charge_array(cls, subjects):
@@ -182,7 +297,9 @@ class Cluster:
             subject_order.append(subject.id)
             charges[i] = cls.get_charge(subject)
 
+        print(charges)
         charges = preprocessing.scale(charges)
+        print(charges)
 
         return subject_order, charges
 
