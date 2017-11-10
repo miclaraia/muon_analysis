@@ -13,6 +13,21 @@ class Camera:
         self.pixSideLength = 1.
         self.numCamSpirals = 13
 
+        self._coordinates = None
+
+    @property
+    def coordinates(self):
+        if self._coordinates is None:
+            raw = self.map_coordinates()
+            coordinates = {}
+
+            for i, x, y in raw:
+                coordinates[i] = (x, y)
+
+            self._coordinates = coordinates
+
+        return self._coordinates
+
     def map_coordinates(self):
         deltaX = math.sqrt(3) * self.pixSideLength / 2.
         deltaY = (3. / 2. * self.pixSideLength)
