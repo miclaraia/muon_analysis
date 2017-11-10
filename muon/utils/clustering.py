@@ -160,6 +160,25 @@ class Cluster:
         self.subjects = subjects
         self.sample_X = self.project_subjects(sample)
 
+    @classmethod
+    def create(cls, subjects):
+        _subjects = list(subjects.subjects.values())
+        _, charges = cls.build_charge_array(_subjects)
+
+        pca = PCA(n_components=2)
+        pca.fit(charges)
+
+        sample = subjects.get_sample(1e4)
+        return cls(pca, subjects, sample)
+
+    @classmethod
+    def run(cls, subjects):
+        cluster = cls.create(subjects)
+        cluster.plot()
+
+        import code
+        code.interact(local=locals())
+
     def plot(self, save=False):
         subject_order, X = self.sample_X
         data = {k:[] for k in [-1, 0, 1]}
@@ -255,23 +274,6 @@ class Cluster:
         elif value == 0:
             return (.1, .1, .8)
         return (.9, .1, .1)
-
-    @classmethod
-    def run(cls, subjects):
-        _subjects = list(subjects.subjects.values())
-        _, charges = cls.build_charge_array(_subjects)
-
-        pca = PCA(n_components=2)
-        pca.fit(charges)
-
-
-        sample = subjects.get_sample(1e4)
-        cluster = cls(pca, subjects, sample)
-        cluster.plot()
-
-
-        import code
-        code.interact(local=locals())
 
     @staticmethod
     def get_charge(subject):
