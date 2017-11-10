@@ -1,5 +1,6 @@
 
 import muon.utils.camera as cam
+import muon.utils.subjects
 from swap.db import DB
 
 import re
@@ -10,6 +11,7 @@ import random
 from sklearn.decomposition import PCA
 from sklearn import preprocessing
 import matplotlib.pyplot as plt
+import pickle
 
 
 class Subject:
@@ -42,8 +44,13 @@ class Subjects:
         if path:
             self.subjects_from_files(path)
 
+    def __getitem__(self, subject):
+        return self.subjects[subject]
+
     def get_sample(self, size):
+        size = int(size)
         subjects = list(self.subjects.values())
+        print('number of subjects', len(subjects))
         if size > len(subjects):
             return subjects
         return random.sample(subjects, size)
@@ -65,12 +72,12 @@ class Subjects:
             subject = self.evt_to_subj(evt)
 
             if subject in self.swap_scores:
+                charge = charge[:-1]
                 score = self.swap_scores[subject]
-                if score.label in [0, 1]:
-                    s = Subject(subject, evt, charge, score)
-                    print(s)
+                # if score.label in [0, 1]:
+                s = Subject(subject, evt, charge, score)
 
-                    subjects[subject] = s
+                subjects[subject] = s
 
         self.subjects = subjects
         return subjects
@@ -90,7 +97,7 @@ class Subjects:
     @staticmethod
     def _make_subject_mapping():
         cursor = DB().subjects.collection.find(
-            {'retired_as': {'$in': [0, 1]}},
+            {'retired_as': {'$in': [-1, 0, 1]}},
             {'subject': 1, 'metadata': 1}
         )   
 
