@@ -13,6 +13,16 @@ import pickle
 def pca():
     pass
 
+
+def interact(local):
+    import numpy as np
+    import pickle
+    def save(path):
+        pickle.dump(local['cluster'], open(path, 'wb'))
+
+    code.interact(local=local)
+
+
 @pca.command()
 @click.argument('path', nargs=-1)
 def run(path):
@@ -21,14 +31,15 @@ def run(path):
 
     cluster = Cluster.create(subjects)
     cluster.plot()
-    code.interact(local=locals())
+
+    interact(locals())
 
 @pca.command()
 @click.argument('path', nargs=1)
 def load(path):
     cluster = pickle.load(open(path, 'rb'))
 
-    code.interact(local=locals())
+    interact(locals())
 
 @pca.command()
 @click.argument('path', nargs=1)
