@@ -1,6 +1,7 @@
 from muon.ui import ui
 import muon.utils.clustering as clustering
 import swap.config
+import muon.scripts.clustering as scripts
 
 import click
 import code
@@ -28,11 +29,31 @@ def run(path):
     swap.config.logger.init()
     subjects = clustering.Subjects(path)
 
-    clustering.Cluster.run(subjects)
+    cluster = clustering.Cluster.create(subjects)
+    cluster.plot()
+    code.interact(local=locals())
 
 @pca.command()
 @click.argument('path', nargs=1)
 def load(path):
-    pickle.load(path)
+    cluster = pickle.load(open(path, 'rb'))
 
     code.interact(local=locals())
+
+@pca.command()
+@click.argument('path', nargs=1)
+def visualize(path):
+    swap.config.logger.init()
+    subjects = clustering.Subjects(path)
+    cluster = clustering.Cluster.create(subjects)
+    cluster.visualize()
+
+
+@pca.command()
+@click.argument('path', nargs=-1)
+@click.argument('script', nargs=1)
+def cluster(path, script):
+    if script == '1':
+        scripts.regions(path)
+    
+
