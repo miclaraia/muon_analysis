@@ -212,7 +212,7 @@ class Cluster:
 
     def subjects_in_range(self, x, y, c, subjects=None):
         if subjects is None:
-            subjects = list(self.subjects.keys())
+            subjects = list(self.subjects.subjects.values())
 
         # Remap bounding box coordinates so name doesn't conflict
         x_ = x
@@ -281,9 +281,8 @@ class Cluster:
 
     def project_subjects(self, subjects):
         """
-        subjects: list of subject id's to project
+        subjects: list of subjects to project
         """
-        subjects = [self.subjects[s] for s in subjects]
         order, charges = self.build_charge_array(subjects)
         X = self.pca.transform(charges)
         return order, X
