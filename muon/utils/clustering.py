@@ -1,6 +1,7 @@
 
 import muon.utils.camera as cam
 import muon.utils.subjects
+from muon.utils.camera import Camera
 from swap.db import DB
 
 import re
@@ -178,6 +179,20 @@ class Cluster:
 
         import code
         code.interact(local=locals())
+
+    def count_class(self, bound, axis, direction):
+        s = list(self.subjects.subjects.values())
+        order, X = self.project_subjects(s)
+
+        count = 0
+        for item in X:
+            if direction == 1:
+                if item[axis] > bound:
+                    count += 1
+            else:
+                if item[axis] < bound:
+                    count += 1
+
 
     def visualize(self):
         camera = Camera()
