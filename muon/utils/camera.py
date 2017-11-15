@@ -6,11 +6,9 @@ import matplotlib.pyplot as plt
 
 class Camera:
 
-    def __init__(self):
-        self.coordinates = None
-
+    def __init__(self, length=None):
         # hexagon pixel side length
-        self.pixSideLength = 1.
+        self.pixSideLength = length or 1.
         self.numCamSpirals = 13
 
         self._coordinates = None
