@@ -1,156 +1,12 @@
 
-import muon.utils.camera as cam
-import muon.utils.subjects
+from muon.utils.subjects import Subjects
 from muon.utils.camera import Camera
-from swap.db import DB
 
-import re
 import numpy as np
-import h5py
-import os
 import random
 from sklearn.decomposition import PCA
 from sklearn import preprocessing
 import matplotlib.pyplot as plt
-import pickle
-from skimage.io import imread
-
-
-class Subject:
-
-    def __init__(self, subject, event, charge, score):
-        self.id = subject
-        self.event = event
-        self.charge = np.array(charge)
-
-        self.label = score.label
-        self.score = score.p
-
-    def __str__(self):
-        return 'id %d event %s label %d score %f' % \
-               (self.id, self.event, self.label, self.score)
-
-class Subjects:
-
-    patterns = {
-        'run': re.compile('run([0-9]+)'),
-        'evt': re.compile('evt([0-9]+)'),
-        'tel': re.compile('tel([0-9]+)'),
-    }
-
-    def __init__(self, path=None):
-        self.subject_mapping = self._make_subject_mapping()
-        self.swap_scores = self.get_swap_scores()
-        self.subjects = {}
-
-        if path:
-            self.subjects_from_files(path)
-
-    def __getitem__(self, subject):
-        return self.subjects[subject]
-
-    def get_sample(self, size):
-        size = int(size)
-        subjects = list(self.subjects.values())
-        print('number of subjects', len(subjects))
-        if size > len(subjects):
-            return subjects
-        return random.sample(subjects, size)
-
-    def evt_to_subj(self, evt):
-        mapping = self.subject_mapping
-        if evt in mapping:
-            return mapping[evt]
-        else:
-            evt = list(evt)
-            evt[2] = -1
-            evt = tuple(evt)
-            return mapping.get(evt, None)
-
-    def subjects_from_files(self, paths):
-        subjects = {}
-        for run, event, charge in self.load_files(paths):
-            evt = self.parse_event(run, event)
-            subject = self.evt_to_subj(evt)
-
-            if subject in self.swap_scores:
-                charge = charge[:-1]
-                score = self.swap_scores[subject]
-                # if score.label in [0, 1]:
-                s = Subject(subject, evt, charge, score)
-
-                subjects[subject] = s
-
-        self.subjects = subjects
-        return subjects
-
-    @classmethod
-    def parse_event(cls, run, evt):
-        def parse(regex, string):
-            s = regex.search(string)
-            return int(s.group(1))
-
-        run = parse(cls.patterns['run'], run)
-        event = parse(cls.patterns['evt'], evt)
-        tel = parse(cls.patterns['tel'], evt)
-
-        return (run, event, tel)
-
-    @staticmethod
-    def _make_subject_mapping():
-        cursor = DB().subjects.collection.find(
-            {'retired_as': {'$in': [-1, 0, 1]}},
-            {'subject': 1, 'metadata': 1}
-        )   
-
-        data = {}
-        for item in cursor:
-            run = item['metadata']['run']
-            evt = item['metadata']['evt']
-            tel = item['metadata']['tel']
-            subject = item['subject']
-
-            data[(run, evt, tel)] = subject
-
-        return data
-
-    @staticmethod
-    def get_swap_scores():
-        return DB().subjects.get_scores()
-
-    @classmethod
-    def load_files(cls, args):
-        print('loading files from %s' % str(args))
-        paths = []
-        for path in args:
-            print(path)
-            if os.path.isdir(path):
-                for fname in os.listdir(path):
-                    print(fname)
-                    if os.path.splitext(fname)[1] == '.hdf5':
-                        paths.append(fname)
-
-            elif os.path.splitext(path)[1] == '.hdf5':
-                paths.append(path)
-
-        print('loading paths %s' % paths)
-        for fname in paths:
-            for item in cls.load_file(fname):
-                yield item
-
-    @staticmethod
-    def load_file(fname):
-        with h5py.File(fname) as file:
-            for run in file:
-                for event in file[run]:
-                    if event == 'summary':
-                        continue
-                    try:
-                        charge = file[run][event]['charge']
-                    except KeyError:
-                        print(run, event)
-                        raise
-                    yield(run, event, charge)
 
 
 class Cluster:
@@ -164,7 +20,7 @@ class Cluster:
 
     @classmethod
     def create(cls, subjects):
-        _subjects = list(subjects.subjects.values())
+        _subjects = subjects.list()
         _, charges = cls.build_charge_array(_subjects)
 
         pca = PCA(n_components=8)
@@ -182,8 +38,8 @@ class Cluster:
         code.interact(local=locals())
 
     def count_class(self, bound, axis, direction):
-        s = list(self.subjects.subjects.values())
-        order, X = self.project_subjects(s)
+        s = self.subjects.list()
+        _, X = self.project_subjects(s)
 
         count = 0
         for item in X:
@@ -204,29 +60,22 @@ class Cluster:
         count = self.pca.n_components_
         for n in range(count):
             component = self.pca.components_[n, :]
+            x, y, c = camera.transform(component)
             ax = fig.add_subplot(1, count+1, n+1, xticks=[], yticks=[])
-            data = []
-            for i, c in enumerate(component):
-                x, y = camera.coordinates[i+1]
-                data.append((x, y, c))
-
-            x, y, c = zip(*data)
             ax.scatter(x, y, c=c, s=10, cmap='viridis')
 
-        ax = fig.add_subplot(1, count+1, count+1, xticks=[], yticks=[])
-        subjects = list(self.subjects.subjects.values())
-        c = [s.charge for s in subjects]
-        c = np.array(c)
-        c = np.mean(c, axis=0)
-        data = []
-        for i, c in enumerate(c):
-            x, y = camera.coordinates[i+1]
-            data.append((x, y, c))
-
-        x, y, c = zip(*data)
+        x, y, c = camera.transform(self.mean_charge())
+        ax = fig.add_subplot(1, 1, 1, xticks=[], yticks=[])
         ax.scatter(x, y, c=c, s=10, cmap='viridis')
 
         plt.show()
+
+    def mean_charge(self):
+        subjects = self.subjects.list()
+        c = [s.charge for s in subjects]
+        c = np.array(c)
+        c = np.mean(c, axis=0)
+        return c
 
     def visualize_mean(self):
         camera = Camera()
@@ -234,34 +83,30 @@ class Cluster:
         fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=.05,
                             wspace=.05)
 
+        x, y, c = camera.transform(self.mean_charge())
         ax = fig.add_subplot(1, 1, 1, xticks=[], yticks=[])
-        data = []
-
-        subjects = list(self.subjects.subjects.values())
-        c = [s.charge for s in subjects]
-        c = np.array(c)
-        c = np.mean(c, axis=0)
-        for i, c in enumerate(c):
-            x, y = camera.coordinates[i+1]
-            data.append((x, y, c))
-
-        x, y, c = zip(*data)
         ax.scatter(x, y, c=c, s=10, cmap='viridis')
 
         plt.show()
 
+    def plot_subjects(self, subjects, save=False):
+        """
+        subjects: list of subject objects
+        """
+        if subjects is None:
+            order, X = self.sample_X
+        else:
+            order, X = self.project_subjects(subjects)
 
-    def plot(self, save=False):
-        subject_order, X = self.sample_X
-        data = {k:[] for k in [-1, 0, 1]}
-        for i, s in enumerate(subject_order):
-            x, y = X[i,:2]
-            label = self.subjects[s].label
-            c = self.color(label)
-            data[label].append((x, y, c))
+        sorted_ = {k:[] for k in [-1, 0, 1]}
+
+        for i, s in enumerate(order):
+            x, y = X[i, :2]
+            label, c = self.subject_plot_label(s)
+            sorted_[label].append((x, y, c))
 
         def plot(v):
-            x, y, c = zip(*data[v])
+            x, y, c = zip(*sorted_[v])
             plt.scatter(x, y, c=c, s=2.5)
 
         for i in [-1, 0, 1]:
@@ -279,13 +124,30 @@ class Cluster:
         else:
             plt.show()
 
+    def subject_plot_label(self, subject_id):
+        s = self.subjects[subject_id]
+        return s.label, s.color()
+
+    def plot(self, save=False):
+        self.plot_subjects(None, save=save)
+
+    def plot_class(self, class_):
+        if type(class_) is int:
+            class_ = [class_]
+        subjects = [s for s in self.subjects.list() if s.label in class_]
+
+        if len(subjects) > 1e4:
+            subjects = random.sample(subjects, 1e4)
+
+        self.plot_subjects(subjects)
+
     def download_plotted_subjects(self, x, y, c, size, prefix='', dir_=None):
         subjects = self.subjects_in_range(x, y, c, self.sample_X[0])
         self.download_subjects(subjects, size, prefix, dir_)
 
     def subjects_in_range(self, x, y, c, subjects=None):
         if subjects is None:
-            subjects = list(self.subjects.subjects.values())
+            subjects = self.subjects.list()
 
         # Remap bounding box coordinates so name doesn't conflict
         x_ = x
@@ -336,17 +198,10 @@ class Cluster:
         subjects: list of subject ids
         size: select random sample from list of subjects
         """
-        if size is not None:
+        if size is not None and size > len(subjects):
             subjects = random.sample(subjects, size)
-        muon.utils.subjects.download_images(subjects, prefix, dir_)
-
-    @staticmethod
-    def color(value):
-        if value == -1:
-            return (.8, .8, .8)
-        elif value == 0:
-            return (.1, .1, .8)
-        return (.9, .1, .1)
+        subjects = [self.subjects[s] for s in subjects]
+        Subjects(subjects).download_images(prefix, dir_)
 
     @staticmethod
     def get_charge(subject):
