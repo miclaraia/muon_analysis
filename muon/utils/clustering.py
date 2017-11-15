@@ -179,6 +179,62 @@ class Cluster:
         import code
         code.interact(local=locals())
 
+    def visualize(self):
+        camera = Camera()
+        fig = plt.figure(figsize=(9, 1))
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=.05,
+                            wspace=.05)
+
+        count = self.pca.n_components_
+        for n in range(count):
+            component = self.pca.components_[n, :]
+            ax = fig.add_subplot(1, count+1, n+1, xticks=[], yticks=[])
+            data = []
+            for i, c in enumerate(component):
+                x, y = camera.coordinates[i+1]
+                data.append((x, y, c))
+
+            x, y, c = zip(*data)
+            ax.scatter(x, y, c=c, s=10, cmap='viridis')
+
+        ax = fig.add_subplot(1, count+1, count+1, xticks=[], yticks=[])
+        subjects = list(self.subjects.subjects.values())
+        c = [s.charge for s in subjects]
+        c = np.array(c)
+        c = np.mean(c, axis=0)
+        data = []
+        for i, c in enumerate(c):
+            x, y = camera.coordinates[i+1]
+            data.append((x, y, c))
+
+        x, y, c = zip(*data)
+        ax.scatter(x, y, c=c, s=10, cmap='viridis')
+
+        plt.show()
+
+    def visualize_mean(self):
+        camera = Camera()
+        fig = plt.figure(figsize=(8, 8))
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=.05,
+                            wspace=.05)
+
+        ax = fig.add_subplot(1, 1, 1, xticks=[], yticks=[])
+        data = []
+
+        subjects = list(self.subjects.subjects.values())
+        c = [s.charge for s in subjects]
+        c = np.array(c)
+        c = np.mean(c, axis=0)
+        for i, c in enumerate(c):
+            x, y = camera.coordinates[i+1]
+            data.append((x, y, c))
+
+        x, y, c = zip(*data)
+        ax.scatter(x, y, c=c, s=10, cmap='viridis')
+
+        plt.show()
+
+
     def plot(self, save=False):
         subject_order, X = self.sample_X
         data = {k:[] for k in [-1, 0, 1]}
