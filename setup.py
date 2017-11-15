@@ -90,6 +90,7 @@ setup(
         'scipy',
         'swap',
         'panoptes_client',
+        'scikit-image',
     ],
 
     # List additional groups of dependencies here (e.g. development

@@ -13,6 +13,7 @@ from sklearn.decomposition import PCA
 from sklearn import preprocessing
 import matplotlib.pyplot as plt
 import pickle
+from skimage.io import imread
 
 
 class Subject:
