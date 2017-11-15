@@ -1,5 +1,6 @@
 from muon.ui import ui
-import muon.utils.clustering as clustering
+from muon.utils.clustering import Cluster
+from muon.utils.subjects import Subjects
 import muon.scripts.clustering as scripts
 import swap.config
 
@@ -16,9 +17,9 @@ def pca():
 @click.argument('path', nargs=-1)
 def run(path):
     swap.config.logger.init()
-    subjects = clustering.Subjects(path)
+    subjects = Subjects.from_data(path)
 
-    cluster = clustering.Cluster.create(subjects)
+    cluster = Cluster.create(subjects)
     cluster.plot()
     code.interact(local=locals())
 
@@ -33,8 +34,8 @@ def load(path):
 @click.argument('path', nargs=1)
 def visualize(path):
     swap.config.logger.init()
-    subjects = clustering.Subjects(path)
-    cluster = clustering.Cluster.create(subjects)
+    subjects = Subjects.from_data(path)
+    cluster = Cluster.create(subjects)
     cluster.visualize()
 
 

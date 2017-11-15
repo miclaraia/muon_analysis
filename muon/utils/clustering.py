@@ -26,7 +26,7 @@ class Cluster:
         pca = PCA(n_components=8)
         pca.fit(charges)
 
-        sample = subjects.get_sample(1e4)
+        sample = subjects.sample(1e4)
         return cls(pca, subjects, sample)
 
     @classmethod
@@ -49,7 +49,6 @@ class Cluster:
             else:
                 if item[axis] < bound:
                     count += 1
-
 
     def visualize(self):
         camera = Camera()

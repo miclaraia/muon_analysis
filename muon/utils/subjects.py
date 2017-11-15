@@ -149,8 +149,6 @@ class Subjects:
             s.download_image(prefix, dir_)
 
     @staticmethod
-
-    @staticmethod
     def get_swap_scores():
         return DB().subjects.get_scores()
 
