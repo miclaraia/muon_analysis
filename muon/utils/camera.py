@@ -26,6 +26,17 @@ class Camera:
 
         return self._coordinates
 
+    def transform(self, charges, split=True):
+        data = []
+        for i, c in enumerate(charges):
+            x, y = self.coordinates[i+1]
+            data.append((x, y, c))
+
+        if split:
+            x, y, c = zip(*data)
+            return x, y, c
+        return data
+
     def map_coordinates(self):
         deltaX = math.sqrt(3) * self.pixSideLength / 2.
         deltaY = (3. / 2. * self.pixSideLength)
