@@ -21,4 +21,3 @@ def print():
 @camera.command()
 def plot():
     muon.utils.camera.Camera().plot()
-
