@@ -166,7 +166,7 @@ class Cluster:
         _subjects = list(subjects.subjects.values())
         _, charges = cls.build_charge_array(_subjects)
 
-        pca = PCA(n_components=2)
+        pca = PCA(n_components=8)
         pca.fit(charges)
 
         sample = subjects.get_sample(1e4)
@@ -254,7 +254,7 @@ class Cluster:
         subject_order, X = self.sample_X
         data = {k:[] for k in [-1, 0, 1]}
         for i, s in enumerate(subject_order):
-            x, y = X[i]
+            x, y = X[i,:2]
             label = self.subjects[s].label
             c = self.color(label)
             data[label].append((x, y, c))
@@ -266,6 +266,7 @@ class Cluster:
         for i in [-1, 0, 1]:
             plot(i)
 
+        plt.axis([-5, 20, -25, 25])
         plt.title('PCA dimensionality reduction of Muon Data')
         plt.xlabel('Principle Component 1')
         plt.ylabel('Principle Component 2')
