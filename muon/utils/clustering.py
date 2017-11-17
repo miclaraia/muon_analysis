@@ -19,9 +19,8 @@ class Cluster:
         self.sample_X = self.project_subjects(sample)
 
     @classmethod
-    def create(cls, subjects):
-        _subjects = subjects.list()
-        _, charges = cls.build_charge_array(_subjects)
+    def create(cls, subjects, components=8):
+        _, charges = cls.scale_charges(subjects)
 
         pca = PCA(n_components=8)
         pca.fit(charges)
@@ -210,24 +209,36 @@ class Cluster:
         """
         subjects: list of subjects to project
         """
+        charges = np.zeros
         order, charges = self.build_charge_array(subjects)
         X = self.pca.transform(charges)
         return order, X
 
     @classmethod
-    def build_charge_array(cls, subjects):
+    def scale_charges(cls, subjects):
         """
-        subjects: list of subjects
+        subjects: subjects object
         """
         subject_order = []
-        charges = np.zeros((len(subjects), len(subjects[0].charge)))
-        for i, subject in enumerate(subjects):
+        _subjects = subjects.list()
+        charges = np.zeros((len(_subjects), len(_subjects[0].charge)))
+        for i, subject in enumerate(_subjects):
             subject_order.append(subject.id)
             charges[i] = cls.get_charge(subject)
 
-        print(charges)
         charges = preprocessing.scale(charges)
         print(charges)
+        subjects.scale_charges(subject_order, charges)
+
+        return subject_order, charges
+
+    @classmethod
+    def build_charge_array(cls, subjects):
+        subject_order = []
+        charges = np.zeros((len(subjects), len(subjects[0].scaled_charge)))
+        for i, subject in enumerate(subjects):
+            subject_order.append(subject.id)
+            charges[i] = subject.scaled_charge
 
         return subject_order, charges
 

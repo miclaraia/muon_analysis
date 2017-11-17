@@ -65,6 +65,7 @@ class Subject:
         self.id = subject
         self.event = event
         self.charge = np.array(charge)
+        self.scaled_charge = None
 
         self.label = score.label
         self.score = score.p
@@ -93,6 +94,8 @@ class Subjects:
     }
 
     def __init__(self, subjects):
+        if type(subjects) is list:
+            subjects = {s.id:s for s in subjects}
         self.subjects = subjects
 
     @classmethod
@@ -110,6 +113,13 @@ class Subjects:
 
     def list(self):
         return list(self.subjects.values())
+
+    def subject_ids(self):
+        return list(self.subjects.keys())
+
+    def scale_charges(self, order, charges):
+        for i, s in enumerate(order):
+            self.subjects[s].scaled_charge = charges[i]
 
     @classmethod
     def evt_to_subj(cls, evt):
