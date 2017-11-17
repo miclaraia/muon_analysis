@@ -20,6 +20,18 @@ def regions(path):
     print('Right region')
     download(cluster, (5, 100), None, None,
              100, 'outer_region', './right')
+def plot_classes(cluster, fname=None):
+    fig = plt.figure()
+    for i, s in enumerate((1, 0, -1)):
+        cluster.plot_class(s, fig=fig, subplot=(2, 2, i+1), show=False,
+                           save=fname)
+
+    fig.show()
+
+
+def all(cluster):
+    subjects = cluster.subjects.list()
+    cluster.plot_class([-1,0,1], True)
 
 
 
