@@ -22,7 +22,7 @@ class Cluster:
     def create(cls, subjects, components=8):
         _, charges = cls.scale_charges(subjects)
 
-        pca = PCA(n_components=8)
+        pca = PCA(n_components=components)
         pca.fit(charges)
 
         sample = subjects.sample(1e4)
