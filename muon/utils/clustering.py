@@ -201,6 +201,20 @@ class Cluster:
         subjects = [self.subjects[s] for s in subjects]
         Subjects(subjects).download_images(prefix, dir_)
 
+    def subject_images(self, subjects, size=None):
+        """
+        Get list of scikit-image objects of subject images from panoptes
+
+        subjects: list of subject ids
+        size: select random sample from list of subjects
+        """
+        print(len(subjects), size)
+        if size is not None and size < len(subjects):
+            subjects = random.sample(subjects, size)
+        print(len(subjects))
+        subjects = [self.subjects[s] for s in subjects]
+        return Subjects(subjects).load_images()
+
     @staticmethod
     def get_charge(subject):
         return np.array(subject.charge)

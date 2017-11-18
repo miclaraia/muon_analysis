@@ -8,6 +8,7 @@ import re
 import numpy as np
 import h5py
 import random
+from skimage.io import imread
 
 
 def _get_subject(subject_id):
@@ -37,6 +38,11 @@ def download_image(subject_id, prefix=None, dir_=None):
 def download_images(subjects, prefix=None, dir_=None):
     for i in subjects:
         download_image(i, prefix, dir_)
+
+def _load_images(subjects):
+    urls = [_get_image_url(s) for s in subjects]
+    for u in urls:
+        yield(imread(u))
 
 
 def _make_subject_mapping():
@@ -157,6 +163,9 @@ class Subjects:
     def download_images(self, prefix=None, dir_=None):
         for s in self.subjects.values():
             s.download_image(prefix, dir_)
+
+    def load_images(self):
+        return _load_images(self.subject_ids())
 
     @staticmethod
     def get_swap_scores():
