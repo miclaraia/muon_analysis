@@ -87,7 +87,7 @@ class Cluster:
 
         plt.show()
 
-    def plot_subjects(self, subjects, save=False):
+    def plot_subjects(self, subjects, save=False, show=True, **kwargs):
         """
         subjects: list of subject objects
         """
@@ -98,46 +98,60 @@ class Cluster:
 
         sorted_ = {k:[] for k in [-1, 0, 1]}
 
+        fig = kwargs.get('fig', plt.figure())
+        subplot = kwargs.get('subplot', (1, 1, 1))
+        ax = fig.add_subplot(*subplot)
         for i, s in enumerate(order):
             x, y = X[i, :2]
             label, c = self.subject_plot_label(s)
             sorted_[label].append((x, y, c))
 
         def plot(v):
-            x, y, c = zip(*sorted_[v])
-            plt.scatter(x, y, c=c, s=2.5)
+            if len(sorted_[v]) > 0:
+                x, y, c = zip(*sorted_[v])
+                ax.scatter(x, y, c=c, s=2.5)
 
         for i in [-1, 0, 1]:
             plot(i)
 
-        plt.axis([-5, 20, -25, 25])
-        plt.title('PCA dimensionality reduction of Muon Data')
-        plt.xlabel('Principle Component 1')
-        plt.ylabel('Principle Component 2')
+        # ax.axis([-5, 20, -25, 25])
+        ax.set_xlim(-5, 15)
+        ax.set_ylim(-20, 20)
+        ax.set_title('PCA dimensionality reduction of Muon Data')
+        ax.set_xlabel('Principle Component 1')
+        ax.set_ylabel('Principle Component 2')
 
         # c = [s.label for s in subjects]
-        if save:
-            plt.savefig('Figure_%d' % self.figure)
-            self.figure += 1
-        else:
+        if save is not None and save is not False:
+            if save is True:
+                plt.savefig('Figure_%d' % self.figure)
+                self.figure += 1
+            else:
+                plt.savefig(save)
+        elif show:
             plt.show()
+
+        return fig, ax
 
     def subject_plot_label(self, subject_id):
         s = self.subjects[subject_id]
         return s.label, s.color()
 
-    def plot(self, save=False):
-        self.plot_subjects(None, save=save)
+    def plot(self, **kwargs):
+        return self.plot_subjects(None, **kwargs)
 
-    def plot_class(self, class_):
+    def plot_all(self, **kwargs):
+        return self.plot_subjects(self.subjects.list(), **kwargs)
+
+    def plot_class(self, class_, force_all=False, **kwargs):
         if type(class_) is int:
             class_ = [class_]
         subjects = [s for s in self.subjects.list() if s.label in class_]
 
-        if len(subjects) > 1e4:
-            subjects = random.sample(subjects, 1e4)
+        if len(subjects) > 1e4 and not force_all:
+            subjects = random.sample(subjects, int(1e4))
 
-        self.plot_subjects(subjects)
+        return self.plot_subjects(subjects, **kwargs)
 
     def download_plotted_subjects(self, x, y, c, size, prefix='', dir_=None):
         subjects = self.subjects_in_range(x, y, c, self.sample_X[0])
@@ -180,7 +194,7 @@ class Cluster:
 
         order, X = self.project_subjects(subjects)
         subjects = []
-        for i, point in enumerate(X):
+        for i, point in enumerate(X[:,:2]):
             x, y = point
             if in_range(x, y):
                 subject = order[i]
@@ -196,8 +210,10 @@ class Cluster:
         subjects: list of subject ids
         size: select random sample from list of subjects
         """
-        if size is not None and size > len(subjects):
+        print(len(subjects), size)
+        if size is not None and size < len(subjects):
             subjects = random.sample(subjects, size)
+        print(len(subjects))
         subjects = [self.subjects[s] for s in subjects]
         Subjects(subjects).download_images(prefix, dir_)
 
