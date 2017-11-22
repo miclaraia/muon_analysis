@@ -91,6 +91,7 @@ setup(
         'swap',
         'panoptes_client',
         'scikit-image',
+        'keras',
     ],
 
     # List additional groups of dependencies here (e.g. development

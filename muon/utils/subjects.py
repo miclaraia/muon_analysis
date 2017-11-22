@@ -130,6 +130,16 @@ class Subjects:
     def subject_ids(self):
         return list(self.subjects.keys())
 
+    def labels(self, order):
+        labels = np.zeros_like(order)
+        for i, s in enumerate(order):
+            l = self.subjects[s].label
+            if l == -1:
+                l = None
+            labels[i] = l
+
+        return labels
+
     @staticmethod
     def _dimensions(subjects):
         l = len(subjects)
