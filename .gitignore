@@ -7,6 +7,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Jupyter/Ipython
+.ipynb_checkpoints/
+
 # Distribution / packaging
 .Python
 env/
@@ -82,6 +85,7 @@ celerybeat-schedule
 # virtualenv
 venv/
 ENV/
+mnt/
 
 # Spyder project settings
 .spyderproject
