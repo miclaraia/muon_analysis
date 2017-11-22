@@ -9,6 +9,7 @@ import numpy as np
 import h5py
 import random
 from skimage.io import imread
+from sklearn import preprocessing
 
 
 def _get_subject(subject_id):
@@ -104,10 +105,16 @@ class Subjects:
             subjects = {s.id:s for s in subjects}
         self.subjects = subjects
 
+        self.dimensions = self._dimensions(self.list())
+
     @classmethod
     def from_data(cls, path):
-        subjects = cls.subjects_from_files(path)
-        return cls(subjects)
+        subject_data = cls.subjects_from_files(path)
+
+        subjects = cls(subject_data)
+        subjects.scale_charges()
+
+        return subjects
 
     def sample(self, size):
         size = int(size)
@@ -123,9 +130,13 @@ class Subjects:
     def subject_ids(self):
         return list(self.subjects.keys())
 
-    def scale_charges(self, order, charges):
-        for i, s in enumerate(order):
-            self.subjects[s].scaled_charge = charges[i]
+    @staticmethod
+    def _dimensions(subjects):
+        l = len(subjects)
+        if l > 0:
+            w = len(subjects[0].charge)
+            return l, w
+        return l,
 
     @classmethod
     def evt_to_subj(cls, evt):
@@ -220,6 +231,32 @@ class Subjects:
                         print(run, event)
                         raise
                     yield(run, event, charge)
+
+    def scale_charges(self):
+        order = []
+        charges = np.zeros(self.dimensions)
+
+        for i, subject in enumerate(self.list()):
+            order.append(subject.id)
+            charges[i] = np.array(subject.charge)
+
+        charges = preprocessing.scale(charges)
+        print(charges)
+        for i, s in enumerate(order):
+            self.subjects[s].scaled_charge = charges[i]
+
+        return order, charges
+
+    def get_charge_array(self):
+        subjects = self.list()
+        order = []
+        charges = np.zeros(self.dimensions)
+        for i, subject in enumerate(subjects):
+            order.append(subject.id)
+            charges[i] = subject.scaled_charge
+
+        return order, charges
+
 
     ##########################################################################
     ###   Operator Overloading   #############################################

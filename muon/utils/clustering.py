@@ -20,7 +20,7 @@ class Cluster:
 
     @classmethod
     def create(cls, subjects, components=8):
-        _, charges = cls.scale_charges(subjects)
+        _, charges = subjects.get_charge_array()
 
         pca = PCA(n_components=components)
         pca.fit(charges)
@@ -231,59 +231,14 @@ class Cluster:
         subjects = [self.subjects[s] for s in subjects]
         return Subjects(subjects).load_images()
 
-    @staticmethod
-    def get_charge(subject):
-        return np.array(subject.charge)
-
     def project_subjects(self, subjects):
         """
         subjects: list of subjects to project
         """
-        charges = np.zeros
-        order, charges = self.build_charge_array(subjects)
+        order, charges = self.charge_array(subjects)
         X = self.pca.transform(charges)
         return order, X
 
-    @classmethod
-    def scale_charges(cls, subjects):
-        """
-        subjects: subjects object
-        """
-        subject_order = []
-        _subjects = subjects.list()
-        charges = np.zeros((len(_subjects), len(_subjects[0].charge)))
-        for i, subject in enumerate(_subjects):
-            subject_order.append(subject.id)
-            charges[i] = cls.get_charge(subject)
-
-        charges = preprocessing.scale(charges)
-        print(charges)
-        subjects.scale_charges(subject_order, charges)
-
-        return subject_order, charges
-
-    @classmethod
-    def build_charge_array(cls, subjects):
-        subject_order = []
-        charges = np.zeros((len(subjects), len(subjects[0].scaled_charge)))
-        for i, subject in enumerate(subjects):
-            subject_order.append(subject.id)
-            charges[i] = subject.scaled_charge
-
-        return subject_order, charges
-
-
-
-
-
-
-    
-
-"""
-1. open a hdf5 file
-2. iterate through events in file
-    filter out duplicate events/telescopes
-3. find appropriate subject
-4. build data array
-5. run pca
-6. plot results"""
+    @staticmethod
+    def charge_array(subjects):
+        return Subjects(subjects).get_charge_array()
