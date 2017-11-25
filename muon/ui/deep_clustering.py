@@ -3,6 +3,7 @@ from muon.utils.subjects import Subjects
 from muon.deep_clustering.clustering import Config, Cluster
 import swap.config
 
+import os
 import click
 import code
 import pickle
@@ -23,6 +24,16 @@ def interact(local):
     code.interact(local={**globals(), **locals(), **local})
 
 
+def load_subjects(path):
+    print(path)
+    print(os.path.splitext(path[0]))
+    if len(path) == 1 and os.path.splitext(path[0])[1] == '.pkl':
+        subjects = pickle.load(open(path[0], 'rb'))
+    else:
+        subjects = Subjects.from_data(path)
+    return subjects
+
+
 @dec.command()
 @click.argument('output', nargs=1)
 @click.argument('weights', nargs=1)
@@ -34,7 +45,8 @@ def run(output, weights, path, save):
         return
 
     swap.config.logger.init()
-    subjects = Subjects.from_data(path)
+    # subjects = Subjects.from_data(path)
+    subjects = load_subjects(path)
     logger.info('Done loading subjects')
 
     config = Config(**{
@@ -50,9 +62,13 @@ def run(output, weights, path, save):
     })
 
     cluster = Cluster.create(subjects, config)
+
+    logger.info('Training model')
+    cluster.train()
     logger.info('Done training network')
 
     # if save:
         # pickle.dump(cluster, open(save, 'wb'))
 
     interact(locals())
+
