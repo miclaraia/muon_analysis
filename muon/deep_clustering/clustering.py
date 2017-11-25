@@ -49,20 +49,25 @@ class Cluster:
             batch_size=config.batch_size
         )
 
-        
-
-        dec.initialize_model(**{
-            'optimizer': SGD(lr=config.lr, momentum=config.momentum),
-            'ae_weights': config.ae_weights,
-            'x': subjects.get_charge_array()
-        })
-        print(dec.model.summary())
-
         return cls(dec, subjects, config)
 
+    def train(self): 
+        config = self.config
+        _, X = self.subjects.get_charge_array()
+        self.dec.initialize_model(**{
+            'optimizer': SGD(lr=config.lr, momentum=config.momentum),
+            'ae_weights': config.ae_weights,
+            'x': X
+        })
+        print(self.dec.model.summary())
+
     def predict(self):
-        order, charges = self.subjects.get_charge_array()
-        labels = self.subjects.predictions(self, order)
+        subjects = self.subjects.labeled_subjects()
+        _, charges, labels = subjects.get_charge_array(True)
+
+        self._dec_predict(charges, labels)
+
+    def _dec_predict(self, charges, labels):
 
         t0 = time()
         y_pred = self.dec.clustering(charges, y=labels, **{

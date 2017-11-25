@@ -130,15 +130,23 @@ class Subjects:
     def subject_ids(self):
         return list(self.subjects.keys())
 
-    def labels(self, order):
-        labels = np.zeros_like(order)
-        for i, s in enumerate(order):
-            l = self.subjects[s].label
-            if l == -1:
-                l = None
-            labels[i] = l
+    # def labels(self, order):
+        # labels = np.zeros(len(order))
+        # for i, s in enumerate(order):
+            # l = self.subjects[s].label
+            # if l == -1:
+                # l = None
+            # labels[i] = l
 
-        return labels
+        # return labels
+
+    def labeled_subjects(self):
+        subjects = []
+        for s in self.list():
+            if s.label in [0, 1]:
+                subjects.append(s)
+
+        return Subjects(subjects)
 
     @staticmethod
     def _dimensions(subjects):
@@ -257,15 +265,21 @@ class Subjects:
 
         return order, charges
 
-    def get_charge_array(self):
+    def get_charge_array(self, labels=False):
+        _labels = labels
         subjects = self.list()
         order = []
+        labels = []
         charges = np.zeros(self.dimensions)
         for i, subject in enumerate(subjects):
             order.append(subject.id)
+            labels.append(subject.label)
             charges[i] = subject.scaled_charge
 
+        if _labels:
+            return order, charges, labels
         return order, charges
+
 
 
     ##########################################################################
