@@ -8,6 +8,7 @@ import re
 import numpy as np
 import h5py
 import random
+import math
 from skimage.io import imread
 from sklearn import preprocessing
 
@@ -43,14 +44,14 @@ def download_images(subjects, prefix=None, dir_=None):
 def _load_images(subjects):
     urls = [_get_image_url(s) for s in subjects]
     for u in urls:
-        yield(imread(u))
+        yield imread(u)
 
 
 def _make_subject_mapping():
     cursor = DB().subjects.collection.find(
         {'retired_as': {'$in': [-1, 0, 1]}},
         {'subject': 1, 'metadata': 1}
-    )   
+    )
 
     data = {}
     for item in cursor:
@@ -64,8 +65,6 @@ def _make_subject_mapping():
     return data
 
 
-    
-
 class Subject:
 
     def __init__(self, subject, event, charge, score):
@@ -77,6 +76,8 @@ class Subject:
         self.label = score.label
         self.score = score.p
 
+        self._normalize()
+
     def download_image(self, prefix, dir_):
         download_image(self.id, prefix, dir_)
 
@@ -86,6 +87,15 @@ class Subject:
         elif self.label == 0:
             return (.1, .1, .8)
         return (.9, .1, .1)
+
+    def _normalize(self):
+        n = np.linalg.norm(self.charge)
+        d = self.charge.shape[0]
+        if n == 0:
+            self.scaled_charge = self.charge.copy()
+        else:
+            c = self.charge / n * math.sqrt(d)
+            self.scaled_charge = c
 
     def __str__(self):
         return 'id %d event %s label %d score %f' % \
@@ -112,7 +122,7 @@ class Subjects:
         subject_data = cls.subjects_from_files(path)
 
         subjects = cls(subject_data)
-        subjects.scale_charges()
+        # subjects.scale_charges()
 
         return subjects
 
