@@ -226,10 +226,12 @@ class Subjects:
                 for fname in os.listdir(path):
                     print(fname)
                     if os.path.splitext(fname)[1] == '.hdf5':
-                        paths.append(fname)
+                        if path not in paths:
+                            paths.append(os.path.join(path, fname))
 
             elif os.path.splitext(path)[1] == '.hdf5':
-                paths.append(path)
+                if path not in paths:
+                    paths.append(path)
 
         print('loading paths %s' % paths)
         for fname in paths:
