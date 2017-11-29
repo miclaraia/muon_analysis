@@ -8,6 +8,7 @@ import click
 import code
 import pickle
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 import logging
 logger = logging.getLogger(__name__)
@@ -35,11 +36,27 @@ def load_subjects(path):
 
 
 @dec.command()
+@click.argument('path', nargs=-1)
+def subjects(path):
+    subjects = load_subjects(path)
+
+    def sample():
+        return random.choice(subjects.list())
+
+    def norm(s):
+        c = s.scaled_charge
+        return np.sum(c*c)
+
+    interact(locals())
+
+
+@dec.command()
 @click.argument('output', nargs=1)
 @click.argument('weights', nargs=1)
 @click.argument('path', nargs=-1)
 @click.option('--save', nargs=1, type=str)
-def run(output, weights, path, save):
+@click.option('--save-subjects', is_flag=True, default=False)
+def run(output, weights, path, save, save_subjects):
     if len(path) == 0:
         print('No data files provided')
         return
@@ -47,6 +64,12 @@ def run(output, weights, path, save):
     swap.config.logger.init()
     # subjects = Subjects.from_data(path)
     subjects = load_subjects(path)
+
+    if save_subjects:
+        fname = os.path.join(output, 'subjects.pkl')
+        logger.info('saving subjects to %s', fname)
+        pickle.dump(subjects, open(fname, 'wb'))
+
     logger.info('Done loading subjects')
 
     config = Config(**{
