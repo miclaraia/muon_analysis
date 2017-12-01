@@ -8,6 +8,8 @@ import numpy as np
 from keras.optimizers import SGD
 from keras.utils import np_utils
 import dec_keras as dk
+import matplotlib.pyplot as plt
+import pandas as pd
 
 
 # this is chosen based on prior knowledge of classes in the data set.
@@ -83,11 +85,16 @@ class Prediction:
 
             print(cluster, *data[-1])
 
-        data = zip(*data)
-        print(data)
-
         # cluster_mapping, n_assigned_list, majority_class_fraction
-        return data
+        keys = ['cluster_mapping',
+                'n_assigned_list',
+                'majority_class_function']
+        data = zip(*data)
+        data = {keys[i]:v for i, v in enumerate(data)}
+        return pd.DataFrame(data)
+
+    def __str__(self):
+        return str(self.cluster_mapping)
 
 
 class Cluster:

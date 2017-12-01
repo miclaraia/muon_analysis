@@ -92,6 +92,7 @@ setup(
         'panoptes_client',
         'scikit-image',
         'keras',
+        'pandas',
     ],
 
     # List additional groups of dependencies here (e.g. development
