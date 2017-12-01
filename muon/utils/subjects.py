@@ -298,10 +298,10 @@ class Subjects:
     @staticmethod
     def load_file(fname):
         print('Loading subjects from %s' % fname)
+        bar = progressbar.ProgressBar()
         with h5py.File(fname) as file:
-            bar = progressbar.ProgressBar()
-            for run in bar(file):
-                for event in file[run]:
+            for run in file:
+                for event in bar(file[run]):
                     if event == 'summary':
                         continue
                     try:
