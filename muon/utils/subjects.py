@@ -1,5 +1,6 @@
 
 from swap.db import DB
+from muon.utils.camera import Camera, CameraPlot
 
 from collections import OrderedDict
 import panoptes_client as pclient
@@ -81,6 +82,16 @@ class Subject:
 
     def download_image(self, prefix, dir_):
         download_image(self.id, prefix, dir_)
+
+    def plot(self, ax, camera=None):
+        if camera is None:
+            camera = Camera()
+
+        # x, y, c = camera.transform(self.charge)
+        # ax.scatter(x, y, c=c, s=10, cmap='viridis')
+
+        CameraPlot.plot(camera.transform(self.charge, False), ax)
+        return ax
 
     def color(self):
         if self.label == -1:
@@ -217,6 +228,33 @@ class Subjects:
     @staticmethod
     def get_swap_scores():
         return DB().subjects.get_scores()
+
+    ##########################################################################
+    ###   Plotting   #########################################################
+    ##########################################################################
+
+    def plot_subjects(self, fig, w=5, camera=None):
+        if camera is None:
+            camera = Camera()
+
+        l = math.ceil(len(self.subjects) / w)
+        fig.set_size_inches(w*5.4, l*5.4)
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=.05,
+                            wspace=.05)
+
+        axes = fig.subplots(l, w, True, subplot_kw={
+            'xticks': [],
+            'yticks': []
+        })
+        if l > 1:
+            axes = axes.flatten()
+        if w == 1:
+            axes = [axes]
+        for i, subject in enumerate(self.list()):
+            subject.plot(axes[i], camera)
+
+        fig.savefig('test.png')
+        return fig
 
     ##########################################################################
     ###   Loading Data from HDF files   ######################################

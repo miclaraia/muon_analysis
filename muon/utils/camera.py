@@ -1,7 +1,10 @@
 
+from swap.utils import Singleton
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
 
 
 class Camera:
@@ -111,7 +114,7 @@ class Camera:
 
         return coordinates
 
-    def plot(self):
+    def _visualize_locations(self):
         data = self.map_coordinates()
         _, x, y = zip(*data)
         plt.scatter(x, y)
@@ -124,4 +127,58 @@ class Camera:
         plt.show()
 
 
+class CameraPlot:
+
+    camera = Camera()
+
+    @classmethod
+    def plot(cls, data, ax, **kwargs):
+        ax.set_xlim(-21,21)
+        ax.set_ylim(-21,21)
+        for loc, spine in ax.spines.items():
+            spine.set_color('none')
+
+
+        colors = []
+        patches = []
+        rot = math.pi/2
+        for i, item in enumerate(data):
+            print(item)
+            x, y, c = item
+            patches.append(cls.get_patch(x, y, rotation=rot))
+            colors.append(c)
+            rot += math.pi/3
+
+        pc = PatchCollection(patches, cmap='viridis', alpha=1)
+        pc.set_array(np.array(colors))
+        ax.add_collection(pc)
+
+
+    @classmethod
+    def get_patch(cls, x, y,
+                  rotation=math.pi/2,
+                  radius=1.,
+                  **kwargs):
+
+        cos = math.cos
+        sin = math.sin
+        pi = math.pi
+        n_sides = 6
+
+        def _x(i):
+            i = float(i)
+            return x + radius * cos(2*pi*i/n_sides + rotation) 
+
+        def _y(i):
+            i = float(i)
+            return y + radius * sin(2*pi*i/n_sides + rotation)
+
+        vertices = []
+        for i in range(n_sides):
+            i += 1
+            vertices.append((_x(i), _y(i)))
+        vertices = np.array(vertices)
+
+        polygon = Polygon(vertices, True)
+        return polygon
 
