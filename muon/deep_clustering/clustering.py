@@ -28,7 +28,7 @@ import pandas as pd
 # ae_weights = '../DEC-keras/results/mnist/ae_weights.h5'
 
 class Config:
-    def __init__(self, save_dir, ae_weights, **kwargs):
+    def __init__(self, save_dir, **kwargs):
         self.n_clusters = kwargs.get('n_clusters', 10)
         self.batch_size = kwargs.get('batch_size', 256)
         self.nodes = kwargs.get('nodes', [500, 500, 2000, 10])
@@ -38,20 +38,30 @@ class Config:
         self.maxiter = kwargs.get('maxiter', 2e4)
         self.update_interval = kwargs.get('update_interval', 140)
         self.save_dir = save_dir
-        self.ae_weights = ae_weights
+
+        self.ae_weights = kwargs.get('ae_weights', None)
+        if self.ae_weights is None:
+            self.ae_weights = os.path.join(save_dir, 'ae_weights.h5')
 
 class Prediction:
-    def __init__(self, order, labels, y_pred, config):
-        self.order = order
+    def __init__(self, order, labels, y_pred, subjects, config):
+        self.order = np.array(order)
         self.labels = labels
         self.y_pred = y_pred
+        self._subjects = subjects
         self.config = config
 
         self.cluster_mapping = self._make_cluster_mapping()
 
-    def subjects(self, subjects):
+    def subjects(self):
+        subjects = self._subjects
         subjects = [subjects[s] for s in self.order]
         return Subjects(subjects)
+
+    def cluster_subjects(self, cluster):
+        subjects = np.where(self.y_pred == cluster)[0]
+        subjects = self.order[subjects]
+        return self._subjects.subset(subjects)
 
     def _make_cluster_mapping(self):
         y = self.labels
@@ -86,12 +96,12 @@ class Prediction:
             print(cluster, *data[-1])
 
         # cluster_mapping, n_assigned_list, majority_class_fraction
-        keys = ['cluster_mapping',
-                'n_assigned_list',
-                'majority_class_function']
-        data = zip(*data)
-        data = {keys[i]:v for i, v in enumerate(data)}
-        return pd.DataFrame(data)
+        keys = ['n_assigned',
+                'majority_class',
+                'majority_class_fraction']
+        # data = zip(*data)
+        # data = {keys[i]:v for i, v in enumerate(data)}
+        return pd.DataFrame(data, columns=keys)
 
     def __str__(self):
         return str(self.cluster_mapping)
@@ -146,7 +156,8 @@ class Cluster:
         else:
             y_pred = self._dec_predict(charges, labels)
 
-        return Prediction(order, labels, y_pred, self.config)
+        return Prediction(order, labels, y_pred,
+                          self.subjects, self.config)
 
     def _dec_predict(self, charges, labels):
         """
