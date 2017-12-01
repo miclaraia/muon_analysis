@@ -45,6 +45,13 @@ def plot(path):
 
     interact(locals())
 
+@subjects.command()
+@click.argument('fname', nargs=1)
+@click.argument('path', nargs=-1)
+def save(fname, path):
+    subjects = load_subjects(path)
+    pickle.dump(subjects, open(fname, 'wb'))
+
 
 @subjects.command()
 def test():
