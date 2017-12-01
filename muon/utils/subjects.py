@@ -13,6 +13,7 @@ import random
 import math
 from skimage.io import imread
 from sklearn import preprocessing
+import progressbar
 
 
 def _get_subject(subject_id):
@@ -296,8 +297,10 @@ class Subjects:
 
     @staticmethod
     def load_file(fname):
+        print('Loading subjects from %s' % fname)
         with h5py.File(fname) as file:
-            for run in file:
+            bar = progressbar.ProgressBar()
+            for run in bar(file):
                 for event in file[run]:
                     if event == 'summary':
                         continue

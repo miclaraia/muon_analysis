@@ -93,6 +93,7 @@ setup(
         'scikit-image',
         'keras',
         'pandas',
+        'progressbar2',
     ],
 
     # List additional groups of dependencies here (e.g. development
