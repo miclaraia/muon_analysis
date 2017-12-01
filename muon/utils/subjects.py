@@ -116,7 +116,7 @@ class Subject:
 
 class Subjects:
 
-    _mapping = _make_subject_mapping()
+    _mapping = None
     patterns = {
         'run': re.compile('run([0-9]+)'),
         'evt': re.compile('evt([0-9]+)'),
@@ -132,6 +132,8 @@ class Subjects:
 
     @classmethod
     def from_data(cls, path):
+        if cls._mapping is None:
+            cls._mapping = _make_subject_mapping()
         subject_data = cls.subjects_from_files(path)
 
         subjects = cls(subject_data)
@@ -349,3 +351,6 @@ class Subjects:
 
     def __getitem__(self, subject):
         return self.subjects[subject]
+
+    def __len__(self):
+        return len(self.subjects)
