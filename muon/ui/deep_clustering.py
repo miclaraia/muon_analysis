@@ -52,11 +52,9 @@ def subjects(path):
 
 @dec.command()
 @click.argument('output', nargs=1)
-@click.argument('weights', nargs=1)
 @click.argument('path', nargs=-1)
-@click.option('--save', nargs=1, type=str)
 @click.option('--save-subjects', is_flag=True, default=False)
-def run(output, weights, path, save, save_subjects):
+def run(output, path, save_subjects):
     if len(path) == 0:
         print('No data files provided')
         return
@@ -81,13 +79,14 @@ def run(output, weights, path, save, save_subjects):
         'maxiter': 2e4,
         'update_interval': 140,
         'save_dir':  output,
-        'ae_weights': weights,
+        'ae_weights': os.path.join(output, 'ae_weights.h5'),
     })
 
     cluster = Cluster.create(subjects, config)
 
     logger.info('Training model')
     cluster.train()
+    pred = cluster.predictions
     logger.info('Done training network')
 
     # if save:
