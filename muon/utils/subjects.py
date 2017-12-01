@@ -14,6 +14,7 @@ import math
 from skimage.io import imread
 from sklearn import preprocessing
 import progressbar
+import matplotlib.pyplot as plt
 
 
 def _get_subject(subject_id):
@@ -91,7 +92,8 @@ class Subject:
         # x, y, c = camera.transform(self.charge)
         # ax.scatter(x, y, c=c, s=10, cmap='viridis')
 
-        CameraPlot.plot(camera.transform(self.charge, False), ax)
+        data = camera.transform(self.charge, False)
+        CameraPlot.plot(data, ax, radius=camera.pixSideLength)
         return ax
 
     def color(self):
@@ -236,6 +238,10 @@ class Subjects:
     ###   Plotting   #########################################################
     ##########################################################################
 
+    def plot_sample(self, size, **kwargs):
+        s = self._sample_s(size)
+        return s.plot_subjects(plt.figure(), **kwargs)
+
     def plot_subjects(self, fig, w=5, camera=None):
         if camera is None:
             camera = Camera()
@@ -303,7 +309,8 @@ class Subjects:
         bar = progressbar.ProgressBar()
         with h5py.File(fname) as file:
             for run in file:
-                for event in bar(file[run]):
+                # for event in bar(file[run]):
+                for event in file[run]:
                     if event == 'summary':
                         continue
                     try:

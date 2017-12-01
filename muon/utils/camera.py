@@ -133,8 +133,10 @@ class CameraPlot:
 
     @classmethod
     def plot(cls, data, ax, **kwargs):
-        ax.set_xlim(-21,21)
-        ax.set_ylim(-21,21)
+        radius = kwargs.get('radius', 1.)
+        bounds = (-21*radius, 21*radius)
+        ax.set_xlim(*bounds)
+        ax.set_ylim(*bounds)
         for loc, spine in ax.spines.items():
             spine.set_color('none')
 
@@ -143,9 +145,8 @@ class CameraPlot:
         patches = []
         rot = math.pi/2
         for i, item in enumerate(data):
-            print(item)
             x, y, c = item
-            patches.append(cls.get_patch(x, y, rotation=rot))
+            patches.append(cls.get_patch(x, y, rotation=rot, **kwargs))
             colors.append(c)
             rot += math.pi/3
 
