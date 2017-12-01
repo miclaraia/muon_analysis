@@ -1,6 +1,7 @@
 
 from swap.db import DB
 
+from collections import OrderedDict
 import panoptes_client as pclient
 import urllib.request
 import os
@@ -113,7 +114,7 @@ class Subjects:
     def __init__(self, subjects):
         if type(subjects) is list:
             subjects = {s.id:s for s in subjects}
-        self.subjects = subjects
+        self.subjects = OrderedDict(subjects)
 
         self.dimensions = self._dimensions(self.list())
 
@@ -134,11 +135,18 @@ class Subjects:
             return subjects
         return random.sample(subjects, size)
 
+    def _sample_s(self, size):
+        return Subjects(self.sample(size))
+
     def list(self):
         return list(self.subjects.values())
 
     def subject_ids(self):
         return list(self.subjects.keys())
+
+    def subset(self, subjects):
+        subset = [self.subjects[s] for s in subjects]
+        return Subjects(subset)
 
     # def labels(self, order):
         # labels = np.zeros(len(order))
