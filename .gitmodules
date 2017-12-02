@@ -1,0 +1,3 @@
+[submodule "notebook"]
+	path = notebook
+	url = git@github.com:miclaraia/muon_notebooks.git
