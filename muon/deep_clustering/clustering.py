@@ -3,6 +3,7 @@ from muon.utils.subjects import Subjects
 
 import os
 from time import time
+import json
 
 import numpy as np
 from keras.optimizers import SGD
@@ -37,11 +38,35 @@ class Config:
         self.tol = kwargs.get('tol', .001)
         self.maxiter = kwargs.get('maxiter', 2e4)
         self.update_interval = kwargs.get('update_interval', 140)
-        self.save_dir = save_dir
 
-        self.ae_weights = kwargs.get('ae_weights', None)
-        if self.ae_weights is None:
-            self.ae_weights = os.path.join(save_dir, 'ae_weights.h5')
+        self.save_dir = os.path.abspath(save_dir)
+
+        subjects = os.path.join(save_dir, 'subjects.pkl')
+        subjects = kwargs.get('subjects', subjects)
+        self.subjects = os.path.abspath(subjects)
+
+        ae_weights = kwargs.get('ae_weights', None)
+        if ae_weights is None:
+            ae_weights = os.path.join(save_dir, 'ae_weights.h5')
+        self.ae_weights = os.path.abspath(ae_weights)
+
+    def dump(self):
+        fname = os.path.join(self.save_dir, 'config.json')
+        json.dump(self.__dict__, open(fname, 'w'))
+
+    @classmethod
+    def load(cls, fname):
+        data = json.load(open(fname, 'r'))
+        config = cls('')
+        config.__dict__.update(data)
+        return config
+
+    def __str__(self):
+        return str(self.__dict__)
+
+    def __repr__(self):
+        return str(self)
+
 
 class Prediction:
     def __init__(self, order, labels, y_pred, subjects, config):

@@ -30,40 +30,28 @@ def load_subjects(path):
     print(os.path.splitext(path[0]))
     if len(path) == 1 and os.path.splitext(path[0])[1] == '.pkl':
         subjects = pickle.load(open(path[0], 'rb'))
+        path = path[0]
     else:
         subjects = Subjects.from_data(path)
-    return subjects
-
-
-@dec.command()
-@click.argument('path', nargs=-1)
-def subjects(path):
-    subjects = load_subjects(path)
-
-    def sample():
-        return random.choice(subjects.list())
-
-    def norm(s):
-        c = s.scaled_charge
-        return np.sum(c*c)
-
-    interact(locals())
+        path = None
+    return subjects, path
 
 
 @dec.command()
 @click.argument('output', nargs=1)
 @click.argument('path', nargs=-1)
-@click.option('--save-subjects', is_flag=True, default=False)
-def run(output, path, save_subjects):
+@click.option('--ae-weights', nargs=1)
+@click.option('--clusters', nargs=1)
+def run(output, path, ae_weights, clusters):
     if len(path) == 0:
         print('No data files provided')
         return
 
     swap.config.logger.init()
     # subjects = Subjects.from_data(path)
-    subjects = load_subjects(path)
+    subjects, fname = load_subjects(path)
 
-    if save_subjects:
+    if fname is None:
         fname = os.path.join(output, 'subjects.pkl')
         logger.info('saving subjects to %s', fname)
         pickle.dump(subjects, open(fname, 'wb'))
@@ -71,7 +59,7 @@ def run(output, path, save_subjects):
     logger.info('Done loading subjects')
 
     config = Config(**{
-        'n_clusters': 10,
+        'n_clusters': int(clusters or 10),
         'batch_size': 256,
         'lr': 0.01,
         'momentum': 0.9,
@@ -79,8 +67,10 @@ def run(output, path, save_subjects):
         'maxiter': 2e4,
         'update_interval': 140,
         'save_dir':  output,
-        'ae_weights': os.path.join(output, 'ae_weights.h5'),
+        'ae_weights': ae_weights or os.path.join(output, 'ae_weights.h5'),
+        'subjects': fname,
     })
+    config.dump()
 
     cluster = Cluster.create(subjects, config)
 
@@ -91,6 +81,20 @@ def run(output, path, save_subjects):
 
     # if save:
         # pickle.dump(cluster, open(save, 'wb'))
+
+    interact(locals())
+
+@dec.command()
+@click.argument('config', nargs=1)
+def load(config):
+    config = Config.load(config)
+    subjects = pickle.load(open(config.subjects, 'rb'))
+    cluster = Cluster.create(subjects, config)
+
+    logger.info('Training model')
+    cluster.train()
+    pred = cluster.predictions
+    logger.info('Done training network')
 
     interact(locals())
 
