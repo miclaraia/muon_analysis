@@ -164,8 +164,6 @@ class FeatureSpace:
             for i, d in distance:
                 cluster.append((i, d, order[i], label[i]))
 
-            print(cluster)
-
             cluster = np.array(cluster, dtype=[
                 ('i', 'i4'),
                 ('d', 'f4'),
@@ -174,13 +172,14 @@ class FeatureSpace:
             clusters.append(cluster)
         return clusters
 
-    def plot_acc(self, c, scale='subject'):
+    def plot_acc(self, c, ax=None, scale='subject'):
         cluster = self.clusters[c]
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
 
         if scale == 'subject':
-            x = range(cluster.shape)
+            x = range(cluster.shape[0])
         elif scale == 'distance':
             x = cluster['d']
         y = []
@@ -193,8 +192,7 @@ class FeatureSpace:
             y.append(n/(i+1))
 
         ax.plot(x, y)
-        return fig
-            
+
 
 class Cluster:
 
