@@ -14,14 +14,14 @@ import pandas as pd
 
 
 # this is chosen based on prior knowledge of classes in the data set.
-# n_clusters = 10 
+# n_clusters = 10
 # batch_size = 256
 # # learning rate
-# lr         = 0.01 
+# lr         = 0.01
 # momentum   = 0.9
 # # tolerance - if clustering stops if less than this fraction
 # # of the data changes cluster on an interation
-# tol        = 0.001 
+# tol        = 0.001
 
 # maxiter         = 2e4
 # update_interval = 140
@@ -132,6 +132,70 @@ class Prediction:
         return str(self.cluster_mapping)
 
 
+class FeatureSpace:
+    def __init__(self, model, subjects, pred, config):
+        self.model = model
+        self.subjects = subjects
+        self.config = config
+        self.prediction = pred
+
+        self.clusters = self.cluster_distance()
+
+    def _predict(self, charge):
+        return self.model.predict(charge)
+
+    def _cluster_distance(self, X, cluster):
+        nearest = np.where(X.argmax(axis=1) == cluster)[0]
+        data = []
+        for i in nearest:
+            data.append((i, X[i][cluster]))
+
+        data = sorted(data, key=lambda i: i[1])
+        return data
+
+    def cluster_distance(self):
+        order, charge, label = self.subjects.get_charge_array(True)
+        X = self._predict(charge)
+
+        clusters = []
+        for c in range(self.config.n_clusters):
+            distance = self._cluster_distance(X, c)
+            cluster = []
+            for i, d in distance:
+                cluster.append((i, d, order[i], label[i]))
+
+            print(cluster)
+
+            cluster = np.array(cluster, dtype=[
+                ('i', 'i4'),
+                ('d', 'f4'),
+                ('s', 'i4'),
+                ('l', 'i4')])
+            clusters.append(cluster)
+        return clusters
+
+    def plot_acc(self, c, scale='subject'):
+        cluster = self.clusters[c]
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+
+        if scale == 'subject':
+            x = range(cluster.shape)
+        elif scale == 'distance':
+            x = cluster['d']
+        y = []
+
+        majority = self.prediction.cluster_mapping['majority_class'][c]
+        n = 0
+        for i, l in enumerate(cluster['l']):
+            if l == majority:
+                n += 1
+            y.append(n/(i+1))
+
+        ax.plot(x, y)
+        return fig
+            
+
 class Cluster:
 
     def __init__(self, dec, subjects, config):
@@ -139,6 +203,7 @@ class Cluster:
         self.subjects = subjects
         self.config = config
         self._predictions = None
+        self._feature_space = None
 
     @classmethod
     def create(cls, subjects, config):
@@ -150,7 +215,7 @@ class Cluster:
 
         return cls(dec, subjects, config)
 
-    def train(self): 
+    def train(self):
         """
         Initialize the dec model and train
         """
@@ -162,6 +227,16 @@ class Cluster:
             'x': X
         })
         print(self.dec.model.summary())
+
+    @property
+    def feature_space(self):
+        if self._feature_space is None:
+            self._feature_space = FeatureSpace(
+                self.dec.model,
+                self.subjects.labeled_subjects(),
+                self.predictions,
+                self.config)
+        return self._feature_space
 
     @property
     def predictions(self):
@@ -203,10 +278,4 @@ class Cluster:
         accuracy = dk.cluster_acc(labels, y_pred)
         print(accuracy)
         return y_pred
-
-
-
-
-
-
 
