@@ -130,7 +130,7 @@ class Subjects:
 
     def __init__(self, subjects):
         if type(subjects) is list:
-            subjects = {s.id:s for s in subjects}
+            subjects = [(s.id, s) for s in subjects]
         self.subjects = OrderedDict(subjects)
 
         self.dimensions = self._dimensions(self.list())
@@ -184,6 +184,11 @@ class Subjects:
                 subjects.append(s)
 
         return Subjects(subjects)
+
+    def sorted_subjects(self, method='swap'):
+        if method == 'swap':
+            s = sorted(self.list(), key=lambda s: s.score)
+        return Subjects(s)
 
     @staticmethod
     def _dimensions(subjects):
