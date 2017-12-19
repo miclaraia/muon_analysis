@@ -85,6 +85,9 @@ class Subject:
     def download_image(self, prefix, dir_):
         download_image(self.id, prefix, dir_)
 
+    def load_image(self):
+        return imread(_get_image_url(self.id))
+
     def plot(self, ax, camera=None):
         if camera is None:
             camera = Camera()
