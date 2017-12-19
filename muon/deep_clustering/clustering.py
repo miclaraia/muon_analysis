@@ -118,7 +118,7 @@ class Prediction:
                          # Fraction of the majority class in this cluster
                          cluster_label_fractions[majority_cluster_class]))
 
-            print(cluster, *data[-1])
+            # print(cluster, *data[-1])
 
         # cluster_mapping, n_assigned_list, majority_class_fraction
         keys = ['n_assigned',
@@ -153,8 +153,22 @@ class FeatureSpace:
         data = sorted(data, key=lambda i: i[1])
         return data
 
+    def closest_subjects(self, cluster, size):
+        cluster_size = self.prediction.cluster_mapping['n_assigned'][cluster]
+        if size == 'all':
+            size = cluster_size
+        else:
+            size = min(cluster_size, size)
+
+        subjects = self.clusters[cluster]['s'][:size]
+        return self.subjects.subset(subjects)
+
+    def cluster_subjects(self, cluster):
+        subjects = self.clusters[cluster]['s']
+        return self.subjects.subset(subjects)
+
     def cluster_distance(self):
-        order, charge, label = self.subjects.get_charge_array(True)
+        order, charge = self.subjects.get_charge_array()
         X = self._predict(charge)
 
         clusters = []
@@ -162,17 +176,20 @@ class FeatureSpace:
             distance = self._cluster_distance(X, c)
             cluster = []
             for i, d in distance:
-                cluster.append((i, d, order[i], label[i]))
+                s = self.subjects[order[i]]
+                cluster.append((i, d, s.id, s.label, s.score))
 
             cluster = np.array(cluster, dtype=[
                 ('i', 'i4'),
                 ('d', 'f4'),
                 ('s', 'i4'),
-                ('l', 'i4')])
+                ('l', 'i4'),
+                ('p', 'f4')])
             clusters.append(cluster)
         return clusters
 
-    def plot_acc(self, c, ax=None, scale='subject'):
+    def plot_acc(self, cluster, ax=None, scale='subject', **kwargs):
+        c = cluster
         cluster = self.clusters[c]
         if ax is None:
             fig = plt.figure()
@@ -191,7 +208,7 @@ class FeatureSpace:
                 n += 1
             y.append(n/(i+1))
 
-        ax.plot(x, y)
+        ax.plot(x, y, **kwargs)
 
 
 class Cluster:
