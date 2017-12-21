@@ -250,12 +250,15 @@ class Subjects:
         s = self._sample_s(size)
         return s.plot_subjects(plt.figure(), **kwargs)
 
-    def plot_subjects(self, fig, w=5, camera=None):
+    def plot_subjects(self, fig=None, w=5, camera=None):
         if camera is None:
             camera = Camera()
 
+        if fig is None:
+            fig = plt.figure()
+
         l = math.ceil(len(self.subjects) / w)
-        fig.set_size_inches(w*5.4, l*5.4)
+        fig.set_size_inches(2*w, 2*l)
         fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=.05,
                             wspace=.05)
 
