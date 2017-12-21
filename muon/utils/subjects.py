@@ -3,90 +3,26 @@ from swap.db import DB
 from muon.utils.camera import Camera, CameraPlot
 
 from collections import OrderedDict
-import panoptes_client as pclient
-import urllib.request
 import os
 import re
 import numpy as np
 import h5py
 import random
 import math
-from skimage.io import imread
 from sklearn import preprocessing
 import progressbar
 import matplotlib.pyplot as plt
 
 
-def _get_subject(subject_id):
-    return pclient.subject.Subject(subject_id)
-
-
-def _get_image_url(subject_id):
-    s = _get_subject(subject_id)
-    url = list(s.raw['locations'][0].values())[0]
-    return url
-
-
-def download_image(subject_id, prefix=None, dir_=None):
-    if prefix is None:
-        prefix = ''
-
-    url = _get_image_url(subject_id)
-    ext = url.split('.')[-1]
-
-    fname = 'muon-%s-%d.%s' % (prefix, subject_id, ext)
-    if dir_ is not None:
-        fname = os.path.join(dir_, fname)
-
-    urllib.request.urlretrieve(url, fname)
-
-
-def download_images(subjects, prefix=None, dir_=None):
-    for i in subjects:
-        download_image(i, prefix, dir_)
-
-def _load_images(subjects):
-    urls = [_get_image_url(s) for s in subjects]
-    for u in urls:
-        yield imread(u)
-
-
-def _make_subject_mapping():
-    cursor = DB().subjects.collection.find(
-        {'retired_as': {'$in': [-1, 0, 1]}},
-        {'subject': 1, 'metadata': 1}
-    )
-
-    data = {}
-    for item in cursor:
-        run = item['metadata']['run']
-        evt = item['metadata']['evt']
-        tel = item['metadata']['tel']
-        subject = item['subject']
-
-        data[(run, evt, tel)] = subject
-
-    return data
-
-
 class Subject:
 
-    def __init__(self, subject, event, charge, score):
+    def __init__(self, subject, event, charge):
         self.id = subject
         self.event = event
         self.charge = np.array(charge)
         self.scaled_charge = None
 
-        self.label = score.label
-        self.score = score.p
-
         self._normalize()
-
-    def download_image(self, prefix, dir_):
-        download_image(self.id, prefix, dir_)
-
-    def load_image(self):
-        return imread(_get_image_url(self.id))
 
     def plot(self, ax, camera=None):
         if camera is None:
@@ -99,11 +35,8 @@ class Subject:
         CameraPlot.plot(data, ax, radius=camera.pixSideLength)
         return ax
 
-    def color(self):
-        if self.label == -1:
-            return (.8, .8, .8)
-        elif self.label == 0:
-            return (.1, .1, .8)
+    @staticmethod
+    def color():
         return (.9, .1, .1)
 
     def _normalize(self):
@@ -116,8 +49,8 @@ class Subject:
             self.scaled_charge = c
 
     def __str__(self):
-        return 'id %d event %s label %d score %f' % \
-               (self.id, self.event, self.label, self.score)
+        return 'id %d event %s' % \
+               (self.id, self.event)
 
 class Subjects:
 
@@ -136,10 +69,9 @@ class Subjects:
         self.dimensions = self._dimensions(self.list())
 
     @classmethod
-    def from_data(cls, path):
-        if cls._mapping is None:
-            cls._mapping = _make_subject_mapping()
-        subject_data = cls.subjects_from_files(path)
+    def from_data(cls, path, subject_mapping):
+        # TODO write a script that makes the subject_mapping!
+        subject_data = cls.subjects_from_files(path, subject_mapping)
 
         subjects = cls(subject_data)
         # subjects.scale_charges()
@@ -154,8 +86,12 @@ class Subjects:
             return subjects
         return random.sample(subjects, size)
 
+    ##########################################################################
+    ###   Subsets   ##########################################################
+    ##########################################################################
+
     def _sample_s(self, size):
-        return Subjects(self.sample(size))
+        return self.__class__(self.sample(size))
 
     def list(self):
         return list(self.subjects.values())
@@ -165,7 +101,7 @@ class Subjects:
 
     def subset(self, subjects):
         subset = [self.subjects[s] for s in subjects]
-        return Subjects(subset)
+        return self.__class__(subset)
 
     # def labels(self, order):
         # labels = np.zeros(len(order))
@@ -183,12 +119,12 @@ class Subjects:
             if s.label in [0, 1]:
                 subjects.append(s)
 
-        return Subjects(subjects)
+        return self.__class__(subjects)
 
     def sorted_subjects(self, method='swap'):
         if method == 'swap':
             s = sorted(self.list(), key=lambda s: s.score)
-        return Subjects(s)
+        return self.__class__(s)
 
     @staticmethod
     def _dimensions(subjects):
@@ -199,13 +135,12 @@ class Subjects:
         return l,
 
     @classmethod
-    def evt_to_subj(cls, evt):
+    def evt_to_subj(cls, evt, mapping):
         """
         Get subject associated with specific run event and telescope
 
         evt: (run, evt, tel)
         """
-        mapping = cls._mapping
         if evt in mapping:
             return mapping[evt]
 
@@ -214,33 +149,19 @@ class Subjects:
         return mapping.get(evt, None)
 
     @classmethod
-    def subjects_from_files(cls, paths):
+    def subjects_from_files(cls, paths, mapping):
         subjects = {}
-        swap_scores = cls.get_swap_scores()
         for run, event, charge in cls.load_files(paths):
             evt = cls.parse_event(run, event)
-            subject = cls.evt_to_subj(evt)
+            subject = cls.evt_to_subj(evt, mapping)
 
-            if subject in swap_scores:
+            if subject is not None:
                 charge = charge[:-1]
-                score = swap_scores[subject]
-                # if score.label in [0, 1]:
-                s = Subject(subject, evt, charge, score)
+                s = Subject(subject, evt, charge)
 
                 subjects[subject] = s
 
         return subjects
-
-    def download_images(self, prefix=None, dir_=None):
-        for s in self.subjects.values():
-            s.download_image(prefix, dir_)
-
-    def load_images(self):
-        return _load_images(self.subject_ids())
-
-    @staticmethod
-    def get_swap_scores():
-        return DB().subjects.get_scores()
 
     ##########################################################################
     ###   Plotting   #########################################################
@@ -360,8 +281,6 @@ class Subjects:
         if _labels:
             return order, charges, labels
         return order, charges
-
-
 
     ##########################################################################
     ###   Operator Overloading   #############################################
