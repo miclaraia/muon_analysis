@@ -1,6 +1,6 @@
 from muon.ui import ui
 from muon.utils.subjects import Subjects
-from muon.deep_clustering.clustering import Config, Cluster
+from muon.deep_clustering.clustering import Config, Cluster, FeatureSpace
 import swap.config
 
 import os
@@ -27,31 +27,28 @@ def interact(local):
 
 def load_subjects(path):
     print(path)
-    print(os.path.splitext(path[0]))
-    if len(path) == 1 and os.path.splitext(path[0])[1] == '.pkl':
-        subjects = pickle.load(open(path[0], 'rb'))
-        path = path[0]
-    else:
+    if os.path.splitext(path)[1] == '.pkl':
+        subjects = pickle.load(open(path, 'rb'))
+        _type = 'pkl'
+    elif os.path.splitext(path)[1] == '.hdf5':
         subjects = Subjects.from_data(path)
-        path = None
-    return subjects, path
+        _type = 'hdf5'
+    return subjects, _type
 
 
 @dec.command()
 @click.argument('output', nargs=1)
-@click.argument('path', nargs=-1)
+@click.argument('subjects', nargs=1)
 @click.option('--ae-weights', nargs=1)
 @click.option('--clusters', nargs=1)
-def run(output, path, ae_weights, clusters):
-    if len(path) == 0:
-        print('No data files provided')
-        return
+def run(output, subjects, ae_weights, clusters):
 
     swap.config.logger.init()
     # subjects = Subjects.from_data(path)
-    subjects, fname = load_subjects(path)
+    fname = subjects
+    subjects, ext = load_subjects(subjects)
 
-    if fname is None:
+    if ext == 'hdf5':
         fname = os.path.join(output, 'subjects.pkl')
         logger.info('saving subjects to %s', fname)
         pickle.dump(subjects, open(fname, 'wb'))
@@ -95,6 +92,11 @@ def load(config):
     cluster.train()
     pred = cluster.predictions
     logger.info('Done training network')
+
+    fs = FeatureSpace(cluster.dec.model,
+                      cluster.subjects.labeled_subjects(),
+                      cluster.predictions,
+                      cluster.config)
 
     interact(locals())
 

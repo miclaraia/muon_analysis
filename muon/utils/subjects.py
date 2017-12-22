@@ -1,5 +1,4 @@
 
-from swap.db import DB
 from muon.utils.camera import Camera, CameraPlot
 
 from collections import OrderedDict
@@ -9,7 +8,6 @@ import numpy as np
 import h5py
 import random
 import math
-from sklearn import preprocessing
 import progressbar
 import matplotlib.pyplot as plt
 
@@ -55,11 +53,6 @@ class Subject:
 class Subjects:
 
     _mapping = None
-    patterns = {
-        'run': re.compile('run([0-9]+)'),
-        'evt': re.compile('evt([0-9]+)'),
-        'tel': re.compile('tel([0-9]+)'),
-    }
 
     def __init__(self, subjects):
         if type(subjects) is list:
@@ -69,14 +62,22 @@ class Subjects:
         self.dimensions = self._dimensions(self.list())
 
     @classmethod
-    def from_data(cls, path, subject_mapping):
+    def from_data(cls, data_file):
         # TODO write a script that makes the subject_mapping!
-        subject_data = cls.subjects_from_files(path, subject_mapping)
+        if not os.path.isfile(data_file):
+            raise IOError('Data file doesn\'t exist!')
 
-        subjects = cls(subject_data)
-        # subjects.scale_charges()
+        subject_data = Subject_Data(data_file)
+        subjects = {}
+        for subject, evt, charge in subject_data:
+            if subject is not None:
+                charge = charge[:-1]
+                s = Subject(subject, evt, charge)
+                subjects[subject] = s
+            else:
+                raise Exception('Subject id was None ....')
 
-        return subjects
+        return cls(subjects)
 
     def sample(self, size):
         size = int(size)
@@ -148,21 +149,6 @@ class Subjects:
         evt = (*evt[:2], -1)
         return mapping.get(evt, None)
 
-    @classmethod
-    def subjects_from_files(cls, paths, mapping):
-        subjects = {}
-        for run, event, charge in cls.load_files(paths):
-            evt = cls.parse_event(run, event)
-            subject = cls.evt_to_subj(evt, mapping)
-
-            if subject is not None:
-                charge = charge[:-1]
-                s = Subject(subject, evt, charge)
-
-                subjects[subject] = s
-
-        return subjects
-
     ##########################################################################
     ###   Plotting   #########################################################
     ##########################################################################
@@ -198,74 +184,8 @@ class Subjects:
         return fig
 
     ##########################################################################
-    ###   Loading Data from HDF files   ######################################
+    ###   Subject Charge Data   ##############################################
     ##########################################################################
-
-    @classmethod
-    def parse_event(cls, run, evt):
-        def parse(regex, string):
-            s = regex.search(string)
-            return int(s.group(1))
-
-        run = parse(cls.patterns['run'], run)
-        event = parse(cls.patterns['evt'], evt)
-        tel = parse(cls.patterns['tel'], evt)
-
-        return (run, event, tel)
-
-    @classmethod
-    def load_files(cls, args):
-        print('loading files from %s' % str(args))
-        paths = []
-        for path in args:
-            print(path)
-            if os.path.isdir(path):
-                for fname in os.listdir(path):
-                    print(fname)
-                    if os.path.splitext(fname)[1] == '.hdf5':
-                        if path not in paths:
-                            paths.append(os.path.join(path, fname))
-
-            elif os.path.splitext(path)[1] == '.hdf5':
-                if path not in paths:
-                    paths.append(path)
-
-        print('loading paths %s' % paths)
-        for fname in paths:
-            for item in cls.load_file(fname):
-                yield item
-
-    @staticmethod
-    def load_file(fname):
-        print('Loading subjects from %s' % fname)
-        bar = progressbar.ProgressBar()
-        with h5py.File(fname) as file:
-            for run in file:
-                # for event in bar(file[run]):
-                for event in file[run]:
-                    if event == 'summary':
-                        continue
-                    try:
-                        charge = file[run][event]['charge']
-                    except KeyError:
-                        print(run, event)
-                        raise
-                    yield(run, event, charge)
-
-    def scale_charges(self):
-        order = []
-        charges = np.zeros(self.dimensions)
-
-        for i, subject in enumerate(self.list()):
-            order.append(subject.id)
-            charges[i] = np.array(subject.charge)
-
-        charges = preprocessing.scale(charges)
-        print(charges)
-        for i, s in enumerate(order):
-            self.subjects[s].scaled_charge = charges[i]
-
-        return order, charges
 
     def get_charge_array(self, labels=False):
         _labels = labels
@@ -291,3 +211,137 @@ class Subjects:
 
     def __len__(self):
         return len(self.subjects)
+
+
+class Subject_Data:
+
+    patterns = {
+        'run': re.compile('run([0-9]+)'),
+        'evt': re.compile('evt([0-9]+)'),
+        'tel': re.compile('tel([0-9]+)'),
+    }
+
+    def __init__(self, data_file):
+        self.num = 0
+        self.output = data_file
+
+        self._file = None
+
+    @property
+    def file(self):
+        if self._file is None:
+            self._file = self.load()
+        return self._file
+
+    def load(self):
+        if os.path.isfile(self.output):
+            file = h5py.File(self.output, 'r+')
+            self.num = file['stats'].attrs['num']
+        else:
+            file = h5py.File(self.output, 'w')
+            stats = file.create_group('stats')
+            stats.attrs['num'] = self.num
+            file.create_group('data')
+
+        return file
+
+    def close(self):
+        self.file.close()
+
+    def __iter__(self):
+        for run in self.file['data']:
+            run = self.file['data'][run]
+            for event in run:
+                event = run[event]
+                _event = (
+                    event.attrs['run'],
+                    event.attrs['evt'],
+                    event.attrs['tel']
+                )
+                subject = event.attrs['subject']
+                charge = event['charge']
+                
+                yield (subject, _event, charge)
+
+    def load_raw(self, args):
+        for run, event, charge in self.raw_files(args):
+            self.add(run, event, charge)
+
+        self.close()
+
+    def add(self, run, event, charge):
+        run, evt, tel = self.parse_event(run, event)
+        _run = str(run)
+        _evt = str(evt)
+
+        data = self.file['data']
+        if _run not in data:
+            data.create_group(_run)
+
+        if _evt not in data[_run]:
+            e = data[_run].create_group(_evt)
+            e.attrs.update({'tel': tel, 'run': run, 'evt': evt})
+            e.attrs['subject'] = self.num
+            e.create_dataset('charge', charge.shape,
+                             data=charge, compression='gzip')
+
+            self.num += 1
+            self.file['stats'].attrs['num'] = self.num
+
+    ##########################################################################
+    ###   Loading Original Data   ############################################
+    ##########################################################################
+
+    @classmethod
+    def parse_event(cls, run, evt):
+        def parse(regex, string):
+            s = regex.search(string)
+            return int(s.group(1))
+
+        run = parse(cls.patterns['run'], run)
+        event = parse(cls.patterns['evt'], evt)
+        tel = parse(cls.patterns['tel'], evt)
+
+        return (run, event, tel)
+
+    @classmethod
+    def raw_files(cls, args):
+        print('loading files from %s' % str(args))
+        paths = []
+        for path in args:
+            print(path)
+            if os.path.isdir(path):
+                for fname in os.listdir(path):
+                    print(fname)
+                    if os.path.splitext(fname)[1] == '.hdf5':
+                        if path not in paths:
+                            paths.append(os.path.join(path, fname))
+
+            elif os.path.splitext(path)[1] == '.hdf5':
+                if path not in paths:
+                    paths.append(path)
+
+        print('loading paths %s' % paths)
+        bar = progressbar.ProgressBar()
+        for fname in bar(paths):
+        # for fname in paths:
+            for item in cls.raw_file(fname):
+                yield item
+
+    @staticmethod
+    def raw_file(fname):
+        print('Loading subjects from %s' % fname)
+        bar = progressbar.ProgressBar()
+        with h5py.File(fname) as file:
+            for run in file:
+                for event in bar(file[run]):
+                # for event in file[run]:
+                    if event == 'summary':
+                        continue
+                    try:
+                        charge = file[run][event]['charge']
+                    except KeyError:
+                        print(run, event)
+                        raise
+                    yield(run, event, charge)
+

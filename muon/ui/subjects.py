@@ -1,9 +1,7 @@
 
 from muon.ui import ui
-from muon.utils.subjects import Subjects
-from muon.deep_clustering.clustering import Config, Cluster
+from muon.utils.subjects import Subjects, Subject_Data
 from muon.utils.camera import Camera, CameraPlot
-import swap.config
 
 import os
 import click
@@ -21,46 +19,50 @@ def subjects():
     pass
 
 
-def load_subjects(path):
-    print(path)
-    print(os.path.splitext(path[0]))
-    if len(path) == 1 and os.path.splitext(path[0])[1] == '.pkl':
-        subjects = pickle.load(open(path[0], 'rb'))
-    else:
-        subjects = Subjects.from_data(path)
-    return subjects
+# def load_subjects(path):
+    # print(path)
+    # print(os.path.splitext(path[0]))
+    # if len(path) == 1 and os.path.splitext(path[0])[1] == '.pkl':
+        # subjects = pickle.load(open(path[0], 'rb'))
+    # else:
+        # subjects = Subjects.from_data(path)
+    # return subjects
 
 
 def interact(local):
     code.interact(local={**globals(), **locals(), **local})
 
-@subjects.command()
-@click.argument('path', nargs=-1)
-def plot(path):
-    subjects = load_subjects(path)
+# @subjects.command()
+# @click.argument('path', nargs=-1)
+# def plot(path):
+    # subjects = load_subjects(path)
 
-    fig = plt.figure()
-    s = subjects._sample_s(20).plot_subjects(fig, 5)
-    # fig.show()
+    # fig = plt.figure()
+    # s = subjects._sample_s(20).plot_subjects(fig, 5)
 
-    interact(locals())
+    # interact(locals())
 
 @subjects.command()
 @click.argument('fname', nargs=1)
-@click.argument('path', nargs=-1)
-def save(fname, path):
-    subjects = load_subjects(path)
+@click.argument('data', nargs=1)
+def save(fname, data):
+    subjects = Subjects.from_data(data)
     pickle.dump(subjects, open(fname, 'wb'))
 
 
 @subjects.command()
-def test():
-    data = [1 for x in range(499)]
-    data = Camera().transform(data, False)
+@click.argument('output', nargs=1)
+@click.argument('raw', nargs=-1)
+def generate(output, raw):
+    sd = Subject_Data(output)
+    sd.load_raw(raw)
+    sd.close()
 
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1, xticks=[], yticks=[])
-    CameraPlot.plot(data, ax)
-    # fig.show()
+
+@subjects.command()
+def test():
+    from muon.utils.subjects import Subject_Data
+    sd = Subject_Data('test.hdf5')
+    sd.load_raw(['hdf5/78573muon_hunter_events_oversampled.hdf5'])
 
     interact(locals())
