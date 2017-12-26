@@ -1,6 +1,7 @@
 
-from swap.utils import Singleton
 import math
+import pickle
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -125,6 +126,108 @@ class Camera:
         plt.axes().set_aspect('equal', 'datalim')
 
         plt.show()
+
+    def rotate(self, n):
+        pass
+
+
+class CameraRotate:
+
+    def __init__(self, data_dir):
+        self.data_dir = data_dir
+        self.camera = Camera()
+
+        self._data = None
+
+    @property
+    def data(self):
+        if self._data is None:
+            if self.data_dir is None:
+                data = self.create_map()
+            else:
+                fname = os.path.join(self.data_dir, 'camera_rotate.pkl')
+                if os.path.isfile(fname):
+                    data = pickle.load(open(fname, 'rb'))
+                else:
+                    data = self.create_map()
+                    with open(fname, 'wb') as file:
+                        pickle.dump(data, file)
+
+            self._data = data
+        return self._data
+
+    def rotate(self, coords, n):
+        new = np.zeros_like(coords)
+        for i in self.data[n]:
+            j = self.data[n][i]
+            new[j-1] = coords[i-1]
+
+        return new
+
+
+    ##########################################################################
+    ###   Creating the map   #################################################
+    ##########################################################################
+
+    def create_map(self):
+        data = {}
+        for n in range(1, 6):
+            data[n] = self._rotate(n)
+
+        return data
+
+    def _rotate(self, n):
+        coords = self.camera.coordinates
+        keys = list(sorted(coords.keys()))
+        coords = np.array([coords[k] for k in keys])
+        rotated = np.zeros_like(coords)
+
+        for i in range(coords.shape[0]):
+            r = np.sum(coords[i]**2)
+            t = np.arctan2(*coords[i])
+
+            t = self._standard_t(t)
+
+            coords[i][0] = r
+            coords[i][1] = t
+
+            if r > 0:
+                t += math.pi*n/3
+                t = self._standard_t(t)
+            else:
+                t = 0
+
+            rotated[i][0] = r
+            rotated[i][1] = t
+
+        new = np.zeros(coords.shape[0])
+        for i in range(coords.shape[0]):
+            a = np.isclose(rotated, coords[i], atol=.05).all(axis=1)
+            if a.any():
+                new[i] = np.where(a == True)[0]
+            else:
+                new[i] = -1
+
+        if -1 in new:
+            raise Exception('Unmapped pixels found in rotation')
+
+        print(new)
+
+        out = {}
+        for i, k in enumerate(keys):
+            out[k] = int(new[i]) + 1
+        return out
+
+    @staticmethod
+    def _standard_t(t):
+        if t < 0:
+            t += 2*math.pi
+        while t >= 2*math.pi:
+            t -= 2*math.pi
+
+        if np.isclose(t, 2*math.pi):
+            t = 0
+        return t
 
 
 class CameraPlot:

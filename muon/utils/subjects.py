@@ -35,6 +35,7 @@ class Subject:
 
     @staticmethod
     def color():
+
         return (.9, .1, .1)
 
     def _normalize(self):
@@ -63,7 +64,6 @@ class Subjects:
 
     @classmethod
     def from_data(cls, data_file):
-        # TODO write a script that makes the subject_mapping!
         if not os.path.isfile(data_file):
             raise IOError('Data file doesn\'t exist!')
 

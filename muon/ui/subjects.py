@@ -1,7 +1,7 @@
 
 from muon.ui import ui
-from muon.utils.subjects import Subjects, Subject_Data
-from muon.utils.camera import Camera, CameraPlot
+from muon.utils.subjects import Subjects, Subject_Data, Subject
+from muon.utils.camera import Camera, CameraPlot, CameraRotate
 
 import os
 import click
@@ -66,3 +66,77 @@ def test():
     sd.load_raw(['hdf5/78573muon_hunter_events_oversampled.hdf5'])
 
     interact(locals())
+
+@subjects.command()
+@click.argument('subject', nargs=1)
+@click.argument('subjects_file', nargs=1)
+def test_rotation(subject, subjects_file):
+    subject = int(subject)
+    import pickle
+    # subjects = pickle.load(open(subjects_file, 'rb'))
+
+    # s2 = subjects._sample_s(10)
+
+    # cr = CameraRotate('.')
+    # cr.data
+
+    # subjects = []
+    # i = 0
+    # for s in s2.list():
+        # s.id = i
+        # subjects.append(s)
+
+        # for n in range(6):
+            # a = cr.rotate(s.charge, n)
+            # subjects.append(Subject(i + n, None, a))
+
+        # i += 6
+
+
+    cr = CameraRotate('.')
+    cr.data
+
+    subject = Subject(0, None, np.array(range(499)))
+    _s = [subject]
+    for i in range(1, 6):
+        a = cr.rotate(subject.charge, i)
+        _s.append(Subject(i, None, a))
+
+    Subjects(_s).plot_subjects(w=6)
+    plt.show()
+
+    interact(locals())
+
+
+@subjects.command()
+@click.argument('subject', nargs=1)
+@click.argument('subjects_file', nargs=1)
+def subject_rotation(subject, subjects_file):
+    subject = int(subject)
+    import pickle
+    subjects = pickle.load(open(subjects_file, 'rb'))
+
+    s2 = subjects._sample_s(10)
+
+    cr = CameraRotate('.')
+    cr.data
+
+    subjects = []
+    i = 0
+    for s in s2.list():
+        s.id = i
+        subjects.append(s)
+
+        for n in range(1,6):
+            a = cr.rotate(s.charge, n)
+            subjects.append(Subject(i + n, None, a))
+
+        i += 6
+
+    Subjects(subjects).plot_subjects(w=6)
+    plt.show()
+
+    interact(locals())
+
+    
+

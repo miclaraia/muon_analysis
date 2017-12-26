@@ -1,6 +1,7 @@
 
 from muon.ui import ui
 import muon.utils.camera
+import code
 
 import click
 
@@ -17,7 +18,9 @@ def print():
     from pprint import pprint
     pprint(coords)
 
-
 @camera.command()
-def plot():
-    muon.utils.camera.Camera().plot()
+def rotate():
+    cr = muon.utils.camera.CameraRotate(None)
+    d = cr.create_map()
+
+    code.interact(local=locals())
