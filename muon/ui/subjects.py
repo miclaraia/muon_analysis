@@ -51,6 +51,13 @@ def save(fname, data):
 
 
 @subjects.command()
+@click.argument('fname', nargs=1)
+def load(fname):
+    subjects = pickle.load(open(fname, 'rb'))
+    interact(locals())
+
+
+@subjects.command()
 @click.argument('output', nargs=1)
 @click.argument('raw', nargs=-1)
 def generate(output, raw):

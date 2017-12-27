@@ -25,17 +25,6 @@ def interact(local):
     code.interact(local={**globals(), **locals(), **local})
 
 
-def load_subjects(path):
-    print(path)
-    if os.path.splitext(path)[1] == '.pkl':
-        subjects = pickle.load(open(path, 'rb'))
-        _type = 'pkl'
-    elif os.path.splitext(path)[1] == '.hdf5':
-        subjects = Subjects.from_data(path)
-        _type = 'hdf5'
-    return subjects, _type
-
-
 @dec.command()
 @click.argument('output', nargs=1)
 @click.argument('subjects', nargs=1)
@@ -46,13 +35,8 @@ def run(output, subjects, ae_weights, clusters):
     swap.config.logger.init()
     # subjects = Subjects.from_data(path)
     fname = subjects
-    subjects, ext = load_subjects(subjects)
-
-    if ext == 'hdf5':
-        fname = os.path.join(output, 'subjects.pkl')
-        logger.info('saving subjects to %s', fname)
-        pickle.dump(subjects, open(fname, 'wb'))
-
+    with open(subjects, 'rb') as file:
+        subjects = pickle.load(file)
     logger.info('Done loading subjects')
 
     config = Config(**{
