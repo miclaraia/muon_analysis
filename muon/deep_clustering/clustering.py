@@ -76,7 +76,8 @@ class Prediction:
         self._subjects = subjects
         self.config = config
 
-        self.cluster_mapping = self._make_cluster_mapping()
+        # self.cluster_mapping = self._make_cluster_mapping()
+        self.cluster_mapping = None
 
     def subjects(self):
         subjects = self._subjects
@@ -235,7 +236,7 @@ class Cluster:
         Initialize the dec model and train
         """
         config = self.config
-        _, X = self.subjects.get_charge_array()
+        _, X, _ = self.subjects.get_charge_array(rotation=True)
         self.dec.initialize_model(**{
             'optimizer': SGD(lr=config.lr, momentum=config.momentum),
             'ae_weights': config.ae_weights,
@@ -261,17 +262,20 @@ class Cluster:
 
     def _predict(self):
         subjects = self.subjects.labeled_subjects()
-        order, charges, labels = subjects.get_charge_array(True)
-        labels = np.array(labels)
+        # TODO remove labels
+        # TODO pass rotations to Prediction object for analysis.
+        order, charges, rotations = subjects.get_charge_array(rotation=True)
 
         path = os.path.join(self.config.save_dir, 'DEC_model_final.h5')
         if os.path.isfile(path):
             self.dec.load_weights(path)
             y_pred = self.dec.predict_clusters(charges)
         else:
-            y_pred = self._dec_predict(charges, labels)
+            # TODO _dec_predict calls for labels, but we hae none
+            y_pred = self._dec_predict(charges, None)
 
-        return Prediction(order, labels, y_pred,
+        # TODO fix labels used for predictions
+        return Prediction(order, None, y_pred,
                           self.subjects, self.config)
 
     def _dec_predict(self, charges, labels):
@@ -290,7 +294,11 @@ class Cluster:
 
         print('clustering time: %.2f' % (time() - t0))
 
-        accuracy = dk.cluster_acc(labels, y_pred)
-        print(accuracy)
+        # TODO doesn't work without labels
+        if labels is not None:
+            accuracy = dk.cluster_acc(labels, y_pred)
+            print(accuracy)
+        else:
+            print("No labels to predict clustering accuracy")
         return y_pred
 

@@ -1,5 +1,5 @@
 
-from muon.utils.camera import Camera, CameraPlot
+from muon.utils.camera import Camera, CameraPlot, CameraRotate
 
 from collections import OrderedDict
 import os
@@ -187,20 +187,39 @@ class Subjects:
     ###   Subject Charge Data   ##############################################
     ##########################################################################
 
-    def get_charge_array(self, labels=False):
-        _labels = labels
+    def get_charge_array(self, rotation=False):
+        if rotation:
+            return self._rotated_charge_array()
         subjects = self.list()
         order = []
-        labels = []
-        charges = np.zeros(self.dimensions)
+
+        dimensions = self.dimensions
+        charges = np.zeros(dimensions)
+
         for i, subject in enumerate(subjects):
             order.append(subject.id)
-            labels.append(subject.label)
             charges[i] = subject.scaled_charge
 
-        if _labels:
-            return order, charges, labels
         return order, charges
+
+    def _rotated_charge_array(self):
+        dimensions = self.dimensions
+        dimensions = (dimensions[0]*6, dimensions[1])
+
+        cr = CameraRotate()
+        order = []
+        rotation = []
+        charges = np.zeros(dimensions)
+        for i, subject in enumerate(self.list()):
+            order += [subject.id for i in range(6)]
+            rotation += list(range(6))
+
+            charge = subject.charge
+            charges[i*6] = charge
+            for n in range(1, 6):
+                charges[i*6 + n] = cr.rotate(charge, n)
+
+        return order, charges, rotation
 
     ##########################################################################
     ###   Operator Overloading   #############################################
