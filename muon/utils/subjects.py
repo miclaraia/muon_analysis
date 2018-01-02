@@ -214,7 +214,7 @@ class Subjects:
             order += [subject.id for i in range(6)]
             rotation += list(range(6))
 
-            charge = subject.charge
+            charge = subject.scaled_charge
             charges[i*6] = charge
             for n in range(1, 6):
                 charges[i*6 + n] = cr.rotate(charge, n)
