@@ -180,13 +180,7 @@ class FeatureSpace:
                 s = self.subjects[order[i]]
                 cluster.append((i, d, s.id, s.label, s.score))
 
-            cluster = np.array(cluster, dtype=[
-                ('i', 'i4'),
-                ('d', 'f4'),
-                ('s', 'i4'),
-                ('l', 'i4'),
-                ('p', 'f4')])
-            clusters.append(cluster)
+            clusters.append(pd.DataFrame(cluster, columns=['i', 'd', 's']))
         return clusters
 
     def plot_acc(self, cluster, ax=None, scale='subject', **kwargs):
@@ -249,7 +243,7 @@ class Cluster:
         if self._feature_space is None:
             self._feature_space = FeatureSpace(
                 self.dec.model,
-                self.subjects.labeled_subjects(),
+                self.subjects,
                 self.predictions,
                 self.config)
         return self._feature_space
@@ -261,7 +255,7 @@ class Cluster:
         return self._predictions
 
     def _predict(self):
-        subjects = self.subjects.labeled_subjects()
+        subjects = self.subjects
         # TODO remove labels
         # TODO pass rotations to Prediction object for analysis.
         order, charges, rotations = subjects.get_charge_array(rotation=True)
