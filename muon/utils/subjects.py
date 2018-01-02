@@ -180,7 +180,6 @@ class Subjects:
         for i, subject in enumerate(self.list()):
             subject.plot(axes[i], camera)
 
-        fig.savefig('test.png')
         return fig
 
     ##########################################################################

@@ -77,7 +77,7 @@ class Prediction:
         self.config = config
 
         # self.cluster_mapping = self._make_cluster_mapping()
-        self.cluster_mapping = None
+        self.cluster_mapping = self._make_cluster_mapping()
 
     def subjects(self):
         subjects = self._subjects
@@ -91,6 +91,9 @@ class Prediction:
 
     def _make_cluster_mapping(self):
         y = self.labels
+        if y is None:
+            y = [-1 for i in self.order]
+
         y_pred = self.y_pred
         n_classes = len(np.unique(y))
         n_clusters = self.config.n_clusters
@@ -178,7 +181,7 @@ class FeatureSpace:
             cluster = []
             for i, d in distance:
                 s = self.subjects[order[i]]
-                cluster.append((i, d, s.id, s.label, s.score))
+                cluster.append((i, d, s.id))
 
             clusters.append(pd.DataFrame(cluster, columns=['i', 'd', 's']))
         return clusters
