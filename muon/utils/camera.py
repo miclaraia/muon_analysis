@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
+import muon.data
+
 
 class Camera:
 
@@ -135,7 +137,7 @@ class CameraRotate:
 
     def __init__(self, data_dir=None):
         if data_dir is None:
-            data_dir = os.path.abspath(os.path.dirname(__file__))
+            data_dir = muon.data.dir()
         self.data_dir = data_dir
         self.camera = Camera()
 
