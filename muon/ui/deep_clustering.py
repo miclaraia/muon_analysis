@@ -77,10 +77,26 @@ def load(config):
     pred = cluster.predictions
     logger.info('Done training network')
 
-    fs = FeatureSpace(cluster.dec.model,
-                      cluster.subjects.labeled_subjects(),
-                      cluster.predictions,
-                      cluster.config)
+    interact(locals())
 
+
+@dec.command()
+@click.argument('config', nargs=1)
+@click.option('--new', is_flag=True)
+def test(config, new):
+    config = Config.load(config)
+    subjects = pickle.load(open(config.subjects, 'rb'))
+    cluster = Cluster.create(subjects, config)
+
+    logger.info('Training model')
+    cluster.train()
+    pred = cluster.predictions
+    logger.info('Done training network')
+
+    from muon.project.images import Random_Images
+    if new:
+        images = Random_Images.new(cluster)
+    else:
+        images = Random_Images.load_group(0)
     interact(locals())
 
