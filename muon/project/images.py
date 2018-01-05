@@ -3,22 +3,34 @@ import math
 import os
 import json
 from shutil import copyfile
+import random
+import matplotlib.pyplot as plt
 
 import muon.data
 
 
 class Image:
 
-    def __init__(self, id_, subjects, metadata, zoo_id=None):
+    def __init__(self, id_, group, subjects, metadata, zoo_id=None):
         self.id = id_
+        self.group = group
         self.subjects = subjects
         self.metadata = metadata
         self.zoo_id = zoo_id
 
+    def __str__(self):
+        return 'id %d group %d subjects %d metadata %s zooid %s' % \
+                (self.id, self.group, len(self.subjects),
+                 str(self.metadata), self.zoo_id)
+
+    def __repr__(self):
+        return str(self)
+
     def dump(self):
         return {
             'id': self.id,
-            'subjects': self.subjects,
+            'group': self.group,
+            'subjects': [int(i) for i in self.subjects],
             'metadata': self.metadata,
             'zooniverse_id': self.zoo_id
         }
@@ -27,6 +39,7 @@ class Image:
     def load(cls, dumped):
         kwargs = {
             'id_': dumped['id'],
+            'group': dumped['group'],
             'subjects': dumped['subjects'],
             'metadata': dumped['metadata'],
             'zoo_id': dumped['zooniverse_id'],
@@ -34,6 +47,16 @@ class Image:
 
         return cls(**kwargs)
 
+    def plot(self, width, subjects, path=None):
+        subjects = subjects.subset(self.subjects)
+        fname = 'muon_group_%d_id_%d.png' % (self.group, self.id)
+        if path:
+            fname = os.path.join(path, fname)
+
+        fig = subjects.plot_subjects(w=width)
+        fig.savefig(fname)
+        plt.close(fig)
+        
 
 class Images:
     _image = Image
@@ -45,8 +68,9 @@ class Images:
         self.group = group
 
         self.size = kwargs.get('image_size', 40)
-        self.image_dim = kwargs.get('image_dim', (50, 50))
+        self.image_dim = kwargs.get('width', 10)
         self.description = kwargs.get('description', None)
+        self.permutations = kwargs.get('permutations', 3)
 
     @classmethod
     def new(cls, cluster, **kwargs):
@@ -64,9 +88,9 @@ class Images:
                 data = json.load(file)
 
         next_id = data['next_id']
-        data = data['groups'][group]
+        data = data['groups'][str(group)]
 
-        images = [i.load() for i in data['images']]
+        images = [cls._image.load(i) for i in data['images']]
         images = cls(group, images, next_id)
 
         images.metadata(data['metadata'])
@@ -109,14 +133,33 @@ class Images:
             b = min(l, a + self.size)
             subset = subjects[a:b]
 
-            images.append(Image(i, subset, None))
+            images.append(Image(i, self.group, subset, None))
 
             i += 1
         self.next_id = i
 
+        self.images = images
         return images
 
-    def save_group(self, images):
+    def split_subjects(self, subjects):
+        images = []
+
+        for _ in range(self.permutations):
+            keys = subjects.keys()
+            random.shuffle(keys)
+
+            length = len(keys)
+            w = math.ceil(length/self.size)
+            for n in range(w):
+                a = n*self.size
+                b = min(length, a+self.size)
+                subset = keys[a:b]
+
+                images.append(subset)
+        return images
+
+    def save_group(self):
+        images = self.images
         fname = self._fname()
         if os.path.isfile(fname):
             with open(fname, 'r') as file:
@@ -140,6 +183,7 @@ class Images:
 
         # TODO save to different file per upload...? Or have them all in the
         # same file. Probably want them all in the same file.
+        # TODO do we need a separate file per workflow?
         with open(fname, 'w') as file:
             json.dump(data, file)
 
@@ -164,18 +208,44 @@ class Images:
         """
         pass
 
-    def generate_images(self):
+    def generate_images(self, subjects, path=None):
         """
         Generate subject images to be uploaded to Panoptes
         """
-        pass
+        for image in self.images:
+            print(image)
+            image.plot(self.image_dim, subjects, path)
 
 
 class Random_Images(Images):
 
-    def __init__(self, subjects, **kwargs):
-        super().__init__(subjects, **kwargs)
+    # def __init__(self, subjects, **kwargs):
+        # super().__init__(subjects, **kwargs)
 
-    def _structure(self):
-        pass
+    def generate_structure(self, cluster):
+        subjects = cluster.subjects
+
+        images = []
+        i = self.next_id
+
+        for c in range(cluster.config.n_clusters):
+            subjects = cluster.feature_space.cluster_subjects(c)
+            subsets = self.split_subjects(subjects)
+
+            for subset in subsets:
+                meta = {
+                    'cluster': c,
+                }
+                images.append(Image(i, self.group, subset, meta))
+                i += 1
+
+        self.next_id = i
+        self.images = images
+        return images
+                
+            
+
+
+
+
 

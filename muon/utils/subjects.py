@@ -97,7 +97,7 @@ class Subjects:
     def list(self):
         return list(self.subjects.values())
 
-    def subject_ids(self):
+    def keys(self):
         return list(self.subjects.keys())
 
     def subset(self, subjects):
