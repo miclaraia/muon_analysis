@@ -112,7 +112,8 @@ class Images:
 
     @staticmethod
     def _fname():
-        return muon.data.path('structure.json')
+        fname = '%s_structure.json' % socket.gethostname()
+        return muon.data.path(fname)
 
     def generate_structure(self, cluster):
         """
