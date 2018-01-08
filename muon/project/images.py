@@ -5,6 +5,9 @@ import json
 from shutil import copyfile
 import random
 import matplotlib.pyplot as plt
+from collections import OrderedDict
+import csv
+import socket
 
 import muon.data
 
@@ -35,6 +38,19 @@ class Image:
             'zooniverse_id': self.zoo_id
         }
 
+    def dump_manifest(self, fname):
+        data = OrderedDict([
+            ('id', self.id),
+            ('#group', self.group),
+            ('image', fname),
+            ('subjects', self.subjects)])
+        for k, v in self.metadata.items():
+            if k not in data:
+                data[k] = v
+
+        return data
+
+
     @classmethod
     def load(cls, dumped):
         kwargs = {
@@ -47,9 +63,12 @@ class Image:
 
         return cls(**kwargs)
 
+    def fname(self):
+        return 'muon_group_%d_id_%d.png' % (self.group, self.id)
+
     def plot(self, width, subjects, path=None):
         subjects = subjects.subset(self.subjects)
-        fname = 'muon_group_%d_id_%d.png' % (self.group, self.id)
+        fname = self.fname()
         if path:
             fname = os.path.join(path, fname)
 
@@ -207,7 +226,15 @@ class Images:
         """
         Generate the subject manifest for Panoptes
         """
-        pass
+        fname = muon.data.path('subject_manifest_%d' % self.group)
+        keys = list(self.images[0].dump_manifest(None).keys())
+
+        with open(fname, 'w') as file:
+            writer = csv.DictWriter(file, fieldnames=keys)
+            writer.writeheader()
+
+            for image in self.images:
+                writer.writerow(image.dump_manifest())
 
     def generate_images(self, subjects, path=None):
         """
@@ -243,10 +270,3 @@ class Random_Images(Images):
         self.next_id = i
         self.images = images
         return images
-                
-            
-
-
-
-
-
