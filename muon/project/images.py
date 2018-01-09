@@ -82,7 +82,14 @@ class Image:
         fig = subjects.plot_subjects(w=width)
         fig.savefig(fname)
         plt.close(fig)
-        
+
+    def at_location(self, x, y, width):
+        x = x//200
+        y = y//200
+
+        i = x+width*y
+        return self.subjects[i]
+
 
 class Images:
     _image = Image
