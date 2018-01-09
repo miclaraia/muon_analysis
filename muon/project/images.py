@@ -9,6 +9,8 @@ from collections import OrderedDict
 import csv
 import socket
 
+import muon.project.panoptes as panoptes
+
 import muon.data
 
 
@@ -38,11 +40,11 @@ class Image:
             'zooniverse_id': self.zoo_id
         }
 
-    def dump_manifest(self, fname):
+    def dump_manifest(self):
         data = OrderedDict([
             ('id', self.id),
             ('#group', self.group),
-            ('image', fname),
+            ('image', self.fname()),
             ('subjects', self.subjects)])
         for k, v in self.metadata.items():
             if k not in data:
@@ -95,6 +97,14 @@ class Images:
         self.image_dim = kwargs.get('width', 10)
         self.description = kwargs.get('description', None)
         self.permutations = kwargs.get('permutations', 3)
+
+    def __str__(self):
+        s = 'group %d images %d metadata %s' % \
+            (self.group, len(self.images), self.metadata())
+        return s
+
+    def __repr__(self):
+        return str(self)
 
     @classmethod
     def new(cls, cluster, **kwargs):
@@ -228,12 +238,37 @@ class Images:
 
         return group, next_id
 
+    def upload_subjects(self, path):
+        uploader = panoptes.Uploader(5918, self.group)
+        existing_subjects = uploader.get_subjects()
+        existing_subjects = {k: v for v, k in existing_subjects}
+
+        for image in self.images:
+            # Skip images that are already uploaded and linked to the
+            # subject set, and make sure the zoo_id map is correct
+            if image.id in existing_subjects:
+                image.zoo_id = existing_subjects[image.id]
+                print('Skipping %s' % image)
+                continue
+
+            fname = os.path.join(path, image.fname())
+
+            subject = panoptes.Subject()
+            subject.add_location(fname)
+            subject.metadata.update(image.dump_manifest())
+
+            subject = uploader.add_subject(subject)
+            image.zoo_id = subject.id
+
+        uploader.upload()
+        self.save_group(True)
+
     def generate_manifest(self):
         """
         Generate the subject manifest for Panoptes
         """
         fname = muon.data.path('subject_manifest_%d' % self.group)
-        keys = list(self.images[0].dump_manifest(None).keys())
+        keys = list(self.images[0].dump_manifest().keys())
 
         with open(fname, 'w') as file:
             writer = csv.DictWriter(file, fieldnames=keys)
