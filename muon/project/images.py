@@ -183,23 +183,24 @@ class Images:
                 images.append(subset)
         return images
 
-    def save_group(self):
+    def save_group(self, overwrite=False):
         images = self.images
+        group = str(self.group)
+
         fname = self._fname()
         if os.path.isfile(fname):
             with open(fname, 'r') as file:
                 data = json.load(file)
-
             copyfile(fname, fname+'.bak')
         else:
             data = {'groups': {}}
 
-        if self.group in data['groups']:
+        if group in data['groups'] and not overwrite:
             print('file contents: ', data)
-            raise Exception('Refusing to overwrite group (%d) in structure '
-                            'file' % self.group)
+            raise Exception('Refusing to overwrite group (%s) in structure '
+                            'file' % group)
 
-        data['groups'][self.group] = {
+        data['groups'][group] = {
             'metadata': self.metadata(),
             'images': [i.dump() for i in images]
         }
