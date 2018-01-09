@@ -69,6 +69,11 @@ class Image:
     def plot(self, width, subjects, path=None):
         subjects = subjects.subset(self.subjects)
         fname = self.fname()
+
+        # Skip if image already exists
+        if fname in os.listdir(path):
+            return
+
         if path:
             fname = os.path.join(path, fname)
 
