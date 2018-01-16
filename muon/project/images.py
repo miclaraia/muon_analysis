@@ -285,6 +285,7 @@ class Images:
         existing_subjects = uploader.get_subjects()
         existing_subjects = {k: v for v, k in existing_subjects}
 
+        print('Creating Panoptes subjects')
         for image in self.images:
             # Skip images that are already uploaded and linked to the
             # subject set, and make sure the zoo_id map is correct
@@ -302,6 +303,7 @@ class Images:
             subject = uploader.add_subject(subject)
             image.zoo_id = subject.id
 
+        print('Uploading subjects')
         uploader.upload()
         self.save_group(True)
 
