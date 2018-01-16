@@ -1,7 +1,9 @@
 
 from muon.ui import ui
 from muon.deep_clustering.clustering import Config, Cluster
-from muon.project.images import Random_Images
+from muon.project.images import Images, Random_Images
+import muon.project.panoptes as pan
+
 import swap.config
 
 import os
@@ -70,3 +72,26 @@ def generate(config, group, path):
     images.generate_images(subjects, path)
 
     interact(locals())
+
+
+@images.command()
+@click.argument('config', nargs=1)
+@click.argument('group', type=int)
+def load(config, group):
+    config = Config.load(config)
+    subjects = pickle.load(open(config.subjects, 'rb'))
+
+    images = Random_Images.load_group(group)
+    interact(locals())
+
+
+@images.command()
+@click.argument('group', type=int)
+@click.argument('path')
+def upload(group, path):
+    images = Images.load_group(group)
+    images.upload_subjects(path)
+
+    interact(locals())
+
+
