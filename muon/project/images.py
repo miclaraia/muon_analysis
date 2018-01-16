@@ -15,6 +15,9 @@ import muon.data
 
 
 class Image:
+    """
+    A group of subjects which are uploaded to Panoptes as a single Image
+    """
 
     def __init__(self, id_, group, subjects, metadata, zoo_id=None):
         self.id = id_
@@ -55,6 +58,9 @@ class Image:
 
     @classmethod
     def load(cls, dumped):
+        """
+        Load Image from an entry in structures file
+        """
         kwargs = {
             'id_': dumped['id'],
             'group': dumped['group'],
@@ -66,9 +72,15 @@ class Image:
         return cls(**kwargs)
 
     def fname(self):
+        """
+        Filename to use for this subject group
+        """
         return 'muon_group_%d_id_%d.png' % (self.group, self.id)
 
     def plot(self, width, subjects, path=None):
+        """
+        Generate and save a plot of this image
+        """
         subjects = subjects.subset(self.subjects)
         fname = self.fname()
 
@@ -84,6 +96,9 @@ class Image:
         plt.close(fig)
 
     def at_location(self, x, y, width):
+        """
+        Return the subject that should be at the given x,y coordinates
+        """
         x = x//200
         y = y//200
 
@@ -115,6 +130,9 @@ class Images:
 
     @classmethod
     def new(cls, cluster, **kwargs):
+        """
+        Create new Images group
+        """
         group, next_id = cls.load_metadata()
         images = cls(group, None, next_id, **kwargs)
         images.generate_structure(cluster)
@@ -123,6 +141,9 @@ class Images:
 
     @classmethod
     def load_group(cls, group):
+        """
+        Load Images object from group entry in structures json file
+        """
         fname = cls._fname()
         if os.path.isfile(fname):
             with open(fname, 'r') as file:
@@ -184,6 +205,10 @@ class Images:
         return images
 
     def split_subjects(self, subjects):
+        """
+        Subdivide a list of subjects into image groups, each of size
+        determined in constructor call.
+        """
         images = []
 
         for _ in range(self.permutations):
@@ -201,6 +226,10 @@ class Images:
         return images
 
     def save_group(self, overwrite=False):
+        """
+        Save the configuration of this Images object to the structures
+        json file
+        """
         images = self.images
         group = str(self.group)
 
@@ -232,6 +261,9 @@ class Images:
 
     @classmethod
     def load_metadata(cls):
+        """
+        Load metadata stored in the header of the structures json file
+        """
         fname = cls._fname()
         if os.path.isfile(fname):
             with open(fname, 'r') as file:
@@ -246,6 +278,9 @@ class Images:
         return group, next_id
 
     def upload_subjects(self, path):
+        """
+        Upload generated images to Panoptes
+        """
         uploader = panoptes.Uploader(5918, self.group)
         existing_subjects = uploader.get_subjects()
         existing_subjects = {k: v for v, k in existing_subjects}
@@ -274,6 +309,7 @@ class Images:
         """
         Generate the subject manifest for Panoptes
         """
+        raise DeprecationWarning
         fname = muon.data.path('subject_manifest_%d' % self.group)
         keys = list(self.images[0].dump_manifest().keys())
 
@@ -294,9 +330,10 @@ class Images:
 
 
 class Random_Images(Images):
-
-    # def __init__(self, subjects, **kwargs):
-        # super().__init__(subjects, **kwargs)
+    """
+    Creates images of subjects grouped by machine learning cluster.
+    Subjects are randomly shuffled within each cluster.
+    """
 
     def generate_structure(self, cluster):
         subjects = cluster.subjects
