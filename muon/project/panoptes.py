@@ -60,9 +60,28 @@ class Uploader:
             raise e
 
         self.subject_queue.append(subject)
-        
+
         print(subject)
         return subject
+
+    def unlink_subjects(self, subjects, delete=True):
+        """
+        Delete subjects from a subject set
+
+        subjects: list of zooniverse subject ids
+        """
+        print('Getting existing subjects')
+        subject_set = self.subject_set
+        subjects = [s for s in subject_set.subjects if s.id in subjects]
+        print('Unlinking subjects')
+        print(subjects)
+        subject_set.remove(subjects)
+        subject_set.save()
+
+        # TODO this doesn't actually work
+        # if delete:
+            # for s in subjects:
+                # Subject.delete(s.id, headers={'If-Match': s.etag})
 
     def upload(self):
         print('Linking %d subjects to subject set %s' %

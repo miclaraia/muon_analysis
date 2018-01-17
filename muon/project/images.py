@@ -152,10 +152,16 @@ class Images:
         next_id = data['next_id']
         data = data['groups'][str(group)]
 
-        images = [cls._image.load(i) for i in data['images']]
-        images = cls(group, images, next_id)
+        images = []
+        for item in data['images']:
+            image = cls._image.load(item)
+            if image.metadata.get('deleted') is True:
+                continue
+            images.append(image)
 
+        images = cls(group, images, next_id)
         images.metadata(data['metadata'])
+
         return images
 
     def metadata(self, new=None):
@@ -225,7 +231,12 @@ class Images:
                 images.append(subset)
         return images
 
-    def save_group(self, overwrite=False):
+    def remove_images(self, images):
+        for image in self.images:
+            if image.id in images:
+                image.metadata['deleted'] = True
+
+    def save_group(self, overwrite=False, backup=None):
         """
         Save the configuration of this Images object to the structures
         json file
@@ -237,7 +248,10 @@ class Images:
         if os.path.isfile(fname):
             with open(fname, 'r') as file:
                 data = json.load(file)
-            copyfile(fname, fname+'.bak')
+
+            if backup is None:
+                backup = fname+'.bak'
+            copyfile(fname, backup)
         else:
             data = {'groups': {}}
 
@@ -344,6 +358,10 @@ class Random_Images(Images):
         i = self.next_id
 
         for c in range(cluster.config.n_clusters):
+            # Skip empty subjects
+            if c == 0:
+                continue
+
             subjects = cluster.feature_space.cluster_subjects(c)
             subsets = self.split_subjects(subjects)
 
