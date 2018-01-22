@@ -48,9 +48,12 @@ class Image:
             ('id', self.id),
             ('#group', self.group),
             ('image', self.fname()),
-            ('subjects', self.subjects)])
+            ('#subjects', self.subjects)])
+        hide = ['cluster']
         for k, v in self.metadata.items():
             if k not in data:
+                if k in hide:
+                    k = '#' + k
                 data[k] = v
 
         return data
