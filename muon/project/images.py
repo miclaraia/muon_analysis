@@ -128,6 +128,13 @@ class Images:
     def __repr__(self):
         return str(self)
 
+    def iter(self):
+        for image in self.list():
+            yield image
+
+    def list(self):
+        return list(self.images.values())
+
     @classmethod
     def new(cls, cluster, **kwargs):
         """
@@ -152,12 +159,12 @@ class Images:
         next_id = data['next_id']
         data = data['groups'][str(group)]
 
-        images = []
+        images = OrderedDict()
         for item in data['images']:
             image = cls._image.load(item)
             if image.metadata.get('deleted') is True:
                 continue
-            images.append(image)
+            images[image.id] = image
 
         images = cls(group, images, next_id)
         images.metadata(data['metadata'])
@@ -232,7 +239,7 @@ class Images:
         return images
 
     def remove_images(self, images):
-        for image in self.images:
+        for image in self.iter():
             if image.id in images:
                 image.metadata['deleted'] = True
 
@@ -241,7 +248,7 @@ class Images:
         Save the configuration of this Images object to the structures
         json file
         """
-        images = self.images
+        images = self.list()
         group = str(self.group)
 
         fname = self._fname()
@@ -300,7 +307,7 @@ class Images:
         existing_subjects = {k: v for v, k in existing_subjects}
 
         print('Creating Panoptes subjects')
-        for image in self.images:
+        for image in self.iter():
             # Skip images that are already uploaded and linked to the
             # subject set, and make sure the zoo_id map is correct
             if image.id in existing_subjects:
@@ -327,20 +334,20 @@ class Images:
         """
         raise DeprecationWarning
         fname = muon.data.path('subject_manifest_%d' % self.group)
-        keys = list(self.images[0].dump_manifest().keys())
+        keys = list(self.list()[0].dump_manifest().keys())
 
         with open(fname, 'w') as file:
             writer = csv.DictWriter(file, fieldnames=keys)
             writer.writeheader()
 
-            for image in self.images:
+            for image in self.iter():
                 writer.writerow(image.dump_manifest())
 
     def generate_images(self, subjects, path=None):
         """
         Generate subject images to be uploaded to Panoptes
         """
-        for image in self.images:
+        for image in self.iter():
             print(image)
             image.plot(self.image_dim, subjects, path)
 
