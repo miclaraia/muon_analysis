@@ -10,6 +10,7 @@ import random
 import math
 import progressbar
 import matplotlib.pyplot as plt
+import string
 
 
 class Subject:
@@ -157,7 +158,7 @@ class Subjects:
         s = self._sample_s(size)
         return s.plot_subjects(plt.figure(), **kwargs)
 
-    def plot_subjects(self, fig=None, w=5, camera=None):
+    def plot_subjects(self, fig=None, w=5, camera=None, grid=False):
         if camera is None:
             camera = Camera()
 
@@ -180,6 +181,42 @@ class Subjects:
         for i, subject in enumerate(self.list()):
             subject.plot(axes[i], camera)
 
+        if grid:
+            fig = self._plot_add_grid(fig, w, l)
+
+        return fig
+
+    def _plot_add_grid(self, fig, w, l):
+        offset = .03
+
+        ax = [offset, 0, 1-offset, 1-offset]
+        ax = fig.add_axes(ax, facecolor=None, frameon=False)
+        fig.set_facecolor('white')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+
+        axes = fig.get_axes()
+        for i in range(l):
+            y = (i+1)/l
+            if y < 1:
+                ax.plot([0, 1], [y, y], c='black', alpha=.6)
+
+            x = offset/2
+            y = (y-1/2/l)*(1-offset)
+            fig.text(x, y, str(l-i), fontsize=14, transform=fig.transFigure)
+        for i in range(w):
+            x = (i+1)/w
+            if x < 1:
+                ax.plot([x, x], [0, 1], c='black', alpha=.6)
+
+            x = ((x-1/2/w)*(1-offset)+(2/3*offset))
+            y = 1-.5*offset
+            a = string.ascii_uppercase[i]
+            fig.text(x, y, a, fontsize=14, transform=fig.transFigure)
+
+        fig.subplots_adjust(left=.03, top=.97)
         return fig
 
     ##########################################################################
