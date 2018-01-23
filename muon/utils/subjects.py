@@ -186,7 +186,8 @@ class Subjects:
 
         return fig
 
-    def _plot_add_grid(self, fig, w, l):
+    @staticmethod
+    def _plot_add_grid(fig, w, l):
         offset = .03
 
         ax = [offset, 0, 1-offset, 1-offset]
@@ -197,7 +198,6 @@ class Subjects:
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
 
-        axes = fig.get_axes()
         for i in range(l):
             y = (i+1)/l
             if y < 1:
