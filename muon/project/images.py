@@ -109,19 +109,14 @@ class Image:
         return self.subjects[i]
 
 
-class Images:
+class Images_Parent:
     _image = Image
 
-    def __init__(self, group, images, next_id, **kwargs):
+    def __init__(self, group, images, next_id):
         self.images = images
         # TODO load existing structure to not duplicate ids
         self.next_id = next_id
         self.group = group
-
-        self.size = kwargs.get('image_size', 40)
-        self.image_dim = kwargs.get('width', 10)
-        self.description = kwargs.get('description', None)
-        self.permutations = kwargs.get('permutations', 3)
 
     def __str__(self):
         s = 'group %d images %d metadata %s' % \
@@ -137,17 +132,6 @@ class Images:
 
     def list(self):
         return list(self.images.values())
-
-    @classmethod
-    def new(cls, cluster, **kwargs):
-        """
-        Create new Images group
-        """
-        group, next_id = cls.load_metadata()
-        images = cls(group, None, next_id, **kwargs)
-        images.generate_structure(cluster)
-
-        return images
 
     @classmethod
     def load_group(cls, group):
@@ -175,6 +159,121 @@ class Images:
         return images
 
     def metadata(self, new=None):
+        pass
+
+    @staticmethod
+    def _fname():
+        fname = '%s_structure.json' % socket.gethostname()
+        return muon.data.path(fname)
+
+    def save_group(self, overwrite=False, backup=None):
+        """
+        Save the configuration of this Images object to the structures
+        json file
+        """
+        images = self.list()
+        group = str(self.group)
+
+        fname = self._fname()
+        data = self._load_data()
+        if data:
+            if backup is None:
+                backup = fname+'.bak'
+            copyfile(fname, backup)
+        else:
+            data = {'groups': {}}
+
+        if group in data['groups'] and not overwrite:
+            print('file contents: ', data)
+            raise Exception('Refusing to overwrite group (%s) in structure '
+                            'file' % group)
+
+        data['groups'][group] = {
+            'metadata': self.metadata(),
+            'images': [i.dump() for i in images]
+        }
+
+        # TODO save to different file per upload...? Or have them all in the
+        # same file. Probably want them all in the same file.
+        # TODO do we need a separate file per workflow?
+        self.update_metadata(data)
+        self._save_data(data)
+
+    @classmethod
+    def _load_data(cls):
+        fname = cls._fname()
+        if os.path.isfile(fname):
+            with open(fname, 'r') as file:
+                data = json.load(file)
+            return data
+
+    @classmethod
+    def _save_data(cls, data):
+        fname = cls._fname()
+        with open(fname, 'w') as file:
+            json.dump(data, file)
+
+    @classmethod
+    def load_metadata(cls, data=None):
+        """
+        Load metadata stored in the header of the structures json file
+        """
+        if data is None:
+            data = cls._load_data()
+        if data:
+            next_id = data['next_id']
+            group = data['next_group']
+        else:
+            next_id = 0
+            group = 0
+
+        return group, next_id
+
+    def update_metadata(self, data=None):
+        if data is None:
+            save = False
+            data = self._load_data()
+        else:
+            save = True
+
+        group = max(self.group+1, data['group'])
+        data['group'] = group
+
+        next_id = max(self.next_id, data['next_id'])
+        data['next_id'] = next_id
+
+        if save:
+            self._save_data(data)
+        return data
+
+    @classmethod
+    def _list_groups(cls):
+        data = cls._load_data()
+        return list(data['groups'].keys())
+
+class Images(Images_Parent):
+    _image = Image
+
+    def __init__(self, group, images, next_id, **kwargs):
+        super().__init__(group, images, next_id)
+
+        self.size = kwargs.get('image_size', 40)
+        self.image_dim = kwargs.get('width', 10)
+        self.description = kwargs.get('description', None)
+        self.permutations = kwargs.get('permutations', 3)
+
+    @classmethod
+    def new(cls, cluster, **kwargs):
+        """
+        Create new Images group
+        """
+        group, next_id = cls.load_metadata()
+        images = cls(group, None, next_id, **kwargs)
+        images.generate_structure(cluster)
+
+        return images
+
+    def metadata(self, new=None):
         if new is None:
             return {
                 'size': self.size,
@@ -187,11 +286,6 @@ class Images:
             self.image_dim = new['dim']
             self.group = new['group']
             self.description = new['description']
-
-    @staticmethod
-    def _fname():
-        fname = '%s_structure.json' % socket.gethostname()
-        return muon.data.path(fname)
 
     def generate_structure(self, cluster):
         """
@@ -220,6 +314,17 @@ class Images:
         self.images = images
         return images
 
+    def splinter(self, size):
+        keys = random.sample(list(self.images), size)
+        subset = {k: self.images.pop(k) for k in keys}
+        group, _ = self.load_metadata()
+        group = max(self.group+1, group)
+
+        splinter = self.__class__(group, subset, None)
+        splinter.metadata(self.metadata())
+
+        return splinter
+
     def split_subjects(self, subjects):
         """
         Subdivide a list of subjects into image groups, each of size
@@ -245,61 +350,6 @@ class Images:
         for image in self.iter():
             if image.id in images:
                 image.metadata['deleted'] = True
-
-    def save_group(self, overwrite=False, backup=None):
-        """
-        Save the configuration of this Images object to the structures
-        json file
-        """
-        images = self.list()
-        group = str(self.group)
-
-        fname = self._fname()
-        if os.path.isfile(fname):
-            with open(fname, 'r') as file:
-                data = json.load(file)
-
-            if backup is None:
-                backup = fname+'.bak'
-            copyfile(fname, backup)
-        else:
-            data = {'groups': {}}
-
-        if group in data['groups'] and not overwrite:
-            print('file contents: ', data)
-            raise Exception('Refusing to overwrite group (%s) in structure '
-                            'file' % group)
-
-        data['groups'][group] = {
-            'metadata': self.metadata(),
-            'images': [i.dump() for i in images]
-        }
-        data['next_id'] = self.next_id
-        data['next_group'] = self.group + 1
-
-        # TODO save to different file per upload...? Or have them all in the
-        # same file. Probably want them all in the same file.
-        # TODO do we need a separate file per workflow?
-        with open(fname, 'w') as file:
-            json.dump(data, file)
-
-    @classmethod
-    def load_metadata(cls):
-        """
-        Load metadata stored in the header of the structures json file
-        """
-        fname = cls._fname()
-        if os.path.isfile(fname):
-            with open(fname, 'r') as file:
-                data = json.load(file)
-
-            next_id = data['next_id']
-            group = data['next_group']
-        else:
-            next_id = 0
-            group = 0
-
-        return group, next_id
 
     def upload_subjects(self, path):
         """

@@ -91,3 +91,11 @@ def upload(group, path):
     interact(locals())
 
 
+@images.command()
+def list():
+    groups = Images._list_groups()
+    print('%d groups in images file:' % len(groups))
+    print(' '.join(groups))
+
+
+
