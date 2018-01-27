@@ -2,11 +2,7 @@
 from muon.ui import ui
 from muon.deep_clustering.clustering import Config, Cluster
 from muon.project.images import Images, Random_Images
-import muon.project.panoptes as pan
 
-import swap.config
-
-import os
 import click
 import code
 import pickle

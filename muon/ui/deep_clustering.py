@@ -1,7 +1,6 @@
 from muon.ui import ui
 from muon.utils.subjects import Subjects
 from muon.deep_clustering.clustering import Config, Cluster, FeatureSpace
-import swap.config
 
 import os
 import click
@@ -32,7 +31,6 @@ def interact(local):
 @click.option('--clusters', nargs=1)
 def run(output, subjects, ae_weights, clusters):
 
-    swap.config.logger.init()
     # subjects = Subjects.from_data(path)
     fname = subjects
     with open(subjects, 'rb') as file:

@@ -1,8 +1,7 @@
 from muon.ui import ui
 from muon.utils.clustering import Cluster
 from muon.utils.subjects import Subjects
-import muon.scripts.clustering as scripts
-import swap.config
+# import swap.config
 
 import click
 import code
@@ -37,7 +36,7 @@ def run(path, components, mle, plot, save, all):
         print('No data files provided')
         return
 
-    swap.config.logger.init()
+    # swap.config.logger.init()
     subjects = Subjects.from_data(path)
     logger.info('Done loading subjects')
 
@@ -65,13 +64,12 @@ def run(path, components, mle, plot, save, all):
 def load(path):
     cluster = pickle.load(open(path, 'rb'))
 
-    plot = lambda: scripts.plot_classes(cluster)
+    # plot = lambda: scripts.plot_classes(cluster)
     interact(locals())
 
 @pca.command()
 @click.argument('path', nargs=1)
 def visualize(path):
-    swap.config.logger.init()
     subjects = Subjects.from_data(path)
     cluster = Cluster.create(subjects)
     cluster.visualize()
@@ -82,4 +80,4 @@ def visualize(path):
 @click.argument('path', nargs=1)
 def region(cluster, path):
     cluster = pickle.load(open(cluster, 'rb'))
-    scripts.regions(cluster, path)
+    # scripts.regions(cluster, path)
