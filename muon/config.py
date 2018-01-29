@@ -1,2 +1,3 @@
 
-cmap = 'viridis'
+cmap = 'jet'
+project = 5918

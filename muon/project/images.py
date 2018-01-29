@@ -10,6 +10,7 @@ import csv
 import socket
 
 import muon.project.panoptes as panoptes
+import muon.config
 
 import muon.data
 
@@ -94,7 +95,7 @@ class Image:
         if path:
             fname = os.path.join(path, fname)
 
-        fig = subjects.plot_subjects(w=width)
+        fig = subjects.plot_subjects(w=width, grid=True)
         fig.savefig(fname)
         plt.close(fig)
 
@@ -111,6 +112,7 @@ class Image:
 
 class Images_Parent:
     _image = Image
+    _loaded_images = {}
 
     def __init__(self, group, images, next_id):
         self.images = images
@@ -156,6 +158,7 @@ class Images_Parent:
         images = cls(group, images, next_id)
         images.metadata(data['metadata'])
 
+        cls._loaded_images[group] = images
         return images
 
     def metadata(self, new=None):
@@ -170,7 +173,9 @@ class Images_Parent:
         """
         Save the configuration of this Images object to the structures
         json file
-        """
+Split Images class into parent and main class
+
+Also added splinter function and better structure saving"""
         images = self.list()
         group = str(self.group)
 
@@ -236,8 +241,8 @@ class Images_Parent:
         else:
             save = True
 
-        group = max(self.group+1, data['group'])
-        data['group'] = group
+        group = max(self.group+1, data['next_group'])
+        data['next_group'] = group
 
         next_id = max(self.next_id, data['next_id'])
         data['next_id'] = next_id
@@ -261,6 +266,8 @@ class Images(Images_Parent):
         self.image_dim = kwargs.get('width', 10)
         self.description = kwargs.get('description', None)
         self.permutations = kwargs.get('permutations', 3)
+
+        self._loaded_images[group] = self
 
     @classmethod
     def new(cls, cluster, **kwargs):
@@ -287,14 +294,13 @@ class Images(Images_Parent):
             self.group = new['group']
             self.description = new['description']
 
-    def generate_structure(self, cluster):
+    def generate_structure(self, subjects):
         """
         Generate a file detailing which subjects belong in which image
         and their location in the image.
 
         """
-        subjects = cluster.subjects
-        images = []
+        images = {}
         i = self.next_id
 
         subjects = subjects.list()
@@ -306,7 +312,7 @@ class Images(Images_Parent):
             b = min(l, a + self.size)
             subset = subjects[a:b]
 
-            images.append(Image(i, self.group, subset, None))
+            images[i] = Image(i, self.group, subset, None)
 
             i += 1
         self.next_id = i
@@ -317,11 +323,17 @@ class Images(Images_Parent):
     def splinter(self, size):
         keys = random.sample(list(self.images), size)
         subset = {k: self.images.pop(k) for k in keys}
-        group, _ = self.load_metadata()
+        group, next_id = self.load_metadata()
         group = max(self.group+1, group)
 
-        splinter = self.__class__(group, subset, None)
-        splinter.metadata(self.metadata())
+        for image in subset.values():
+            image.group = group
+
+        splinter = self.__class__(group, subset, next_id)
+
+        meta = self.metadata()
+        meta['group'] = group
+        splinter.metadata(meta)
 
         return splinter
 
@@ -355,7 +367,7 @@ class Images(Images_Parent):
         """
         Upload generated images to Panoptes
         """
-        uploader = panoptes.Uploader(5918, self.group)
+        uploader = panoptes.Uploader(muon.config.project, self.group)
         existing_subjects = uploader.get_subjects()
         existing_subjects = {k: v for v, k in existing_subjects}
 
@@ -368,7 +380,7 @@ class Images(Images_Parent):
                 print('Skipping %s' % image)
                 continue
 
-            fname = os.path.join(path, image.fname())
+            fname = os.path.join(path, 'group_%d' % self.group, image.fname())
 
             subject = panoptes.Subject()
             subject.add_location(fname)
@@ -400,6 +412,9 @@ class Images(Images_Parent):
         """
         Generate subject images to be uploaded to Panoptes
         """
+        path = os.path.join(path, 'group_%d' % self.group)
+        if not os.path.isdir(path):
+            os.mkdir(path)
         for image in self.iter():
             print(image)
             image.plot(self.image_dim, subjects, path)
@@ -414,7 +429,7 @@ class Random_Images(Images):
     def generate_structure(self, cluster):
         subjects = cluster.subjects
 
-        images = []
+        images = {}
         i = self.next_id
 
         for c in range(cluster.config.n_clusters):
@@ -429,7 +444,7 @@ class Random_Images(Images):
                 meta = {
                     'cluster': c,
                 }
-                images.append(Image(i, self.group, subset, meta))
+                images[i] = Image(i, self.group, subset, meta)
                 i += 1
 
         self.next_id = i
