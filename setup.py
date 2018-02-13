@@ -88,12 +88,13 @@ setup(
         'pylint',
         'sklearn',
         'scipy',
-        'swap',
         'panoptes_client',
         'scikit-image',
         'keras',
         'pandas',
         'progressbar2',
+        'click',
+        'dec-keras'
     ],
 
     # List additional groups of dependencies here (e.g. development
