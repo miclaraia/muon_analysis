@@ -76,6 +76,7 @@ def generate(config, group, path):
 
     images = Random_Images.load_group(group)
     images.generate_images(subjects, path)
+    images.save_group(overwrite=True)
 
     interact(locals())
 

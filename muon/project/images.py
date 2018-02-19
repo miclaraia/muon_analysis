@@ -95,18 +95,45 @@ class Image:
         if path:
             fname = os.path.join(path, fname)
 
-        fig = subjects.plot_subjects(w=width, grid=True)
-        fig.savefig(fname)
+        offset = .5
+        dpi = 96
+        fig, meta = subjects.plot_subjects(
+            w=width, grid=True, grid_args={'offset': offset}, meta=True)
+
+        metadata = {
+            'dpi': dpi,
+            'offset': offset,
+            **meta
+        }
+        self.metadata.update({'figure': metadata})
+
+        fig.savefig(fname, dpi=dpi)
+
         plt.close(fig)
 
-    def at_location(self, x, y, width):
+    def at_location(self, x, y):
         """
         Return the subject that should be at the given x,y coordinates
         """
-        x = x//200
-        y = y//200
+        meta = self.metadata['figure']
+        print(meta)
+        dpi = meta['dpi']
+        offset = meta['offset']*dpi
+        height = meta['height']*dpi-offset
+        width = meta['width']*dpi-offset
 
-        i = x+width*y
+        y_ = height/meta['rows']
+        x_ = width/meta['cols']
+        print('offset: ', offset)
+
+        print('x_: ', x_)
+        print('y_: ', y_)
+
+        x = (x-offset)//x_
+        y = meta['cols'] - 1 - y//y_
+
+        i = int(x+meta['cols']*y)
+        print(i)
         return self.subjects[i]
 
 

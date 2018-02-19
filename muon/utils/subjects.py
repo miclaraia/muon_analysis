@@ -158,7 +158,8 @@ class Subjects:
         s = self._sample_s(size)
         return s.plot_subjects(plt.figure(), **kwargs)
 
-    def plot_subjects(self, fig=None, w=5, camera=None, grid=False):
+    def plot_subjects(self, fig=None, w=5, camera=None,
+                      grid=False, grid_args=None, meta=None):
         if camera is None:
             camera = Camera()
 
@@ -182,15 +183,40 @@ class Subjects:
             subject.plot(axes[i], camera)
 
         if grid:
-            fig = self._plot_add_grid(fig, w, l)
+            if grid_args is None:
+                grid_args = {}
+            fig = self._plot_add_grid(fig, w, l, **grid_args)
 
+
+        if meta:
+            size = fig.get_size_inches()
+            meta = {
+                'height': size[1],
+                'width': size[0],
+                'rows': l,
+                'cols': w,
+            }
+
+            return fig, meta
         return fig
 
     @staticmethod
-    def _plot_add_grid(fig, w, l):
-        offset = .03
+    def _plot_add_grid(fig, w, l, offset=None):
 
-        ax = [offset, 0, 1-offset, 1-offset]
+        # Calculate the offset in x and y directions
+        # offset initially in inches, then offset_x,y are fractional
+        if offset is None:
+            offset = .5
+        width, height = fig.get_size_inches()
+        width += offset
+        height += offset
+        fig.set_size_inches(width, height)
+
+        offset_x = offset/width
+        offset_y = offset/height
+
+        # Add the subplot to draw the grid and text
+        ax = [offset_x, 0, 1-offset_x, 1-offset_y]
         ax = fig.add_axes(ax, facecolor=None, frameon=False)
         fig.set_facecolor('white')
         ax.set_xticks([])
@@ -198,25 +224,31 @@ class Subjects:
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
 
+        # Add the row components (horizontal lines and row index)
         for i in range(l):
             y = (i+1)/l
             if y < 1:
                 ax.plot([0, 1], [y, y], c='black', alpha=.6)
 
-            x = offset/2
-            y = (y-1/2/l)*(1-offset)
+            # Calculate text location
+            x = offset_x/2
+            y = (y-1/2/l)*(1-offset_y)
             fig.text(x, y, str(l-i), fontsize=14, transform=fig.transFigure)
+
+        # Add the column components (vertical lines and column letters)
         for i in range(w):
             x = (i+1)/w
             if x < 1:
                 ax.plot([x, x], [0, 1], c='black', alpha=.6)
 
-            x = ((x-1/2/w)*(1-offset)+(2/3*offset))
-            y = 1-.5*offset
+            # Calculate text location
+            #x = ((x-1/2/w)*(1-offset_x)+(2/3*offset_x))
+            x = (2*i+1)/2/w*(1-offset_x)+.02
+            y = 1-offset_y*2/3
             a = string.ascii_uppercase[i]
             fig.text(x, y, a, fontsize=14, transform=fig.transFigure)
 
-        fig.subplots_adjust(left=.03, top=.97)
+        fig.subplots_adjust(left=offset_x, top=(1-offset_y))
         return fig
 
     ##########################################################################
