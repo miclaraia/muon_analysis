@@ -299,6 +299,12 @@ class Subjects:
     def __len__(self):
         return len(self.subjects)
 
+    def __str__(self):
+        return '%d subjects' % len(self.subjects)
+
+    def __repr__(self):
+        return str(self)
+
 
 class Subject_Data:
 
