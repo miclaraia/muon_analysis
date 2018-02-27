@@ -96,7 +96,7 @@ class Image:
             fname = os.path.join(path, fname)
 
         offset = .5
-        dpi = 96
+        dpi = 100
         fig, meta = subjects.plot_subjects(
             w=width, grid=True, grid_args={'offset': offset}, meta=True)
 
@@ -122,15 +122,27 @@ class Image:
         height = meta['height']*dpi-offset
         width = meta['width']*dpi-offset
 
+        if 'beta_image' in meta:
+            # This image was generated before the offset bug was discovered
+            # and need to correct the vertical offset to get the right
+            # boundary calculations
+            width = meta['width']*dpi*0.97
+            height = meta['height']*dpi*0.97
+            y = y - 0.03*meta['height']*dpi + offset
+
         y_ = height/meta['rows']
         x_ = width/meta['cols']
+        print('x: ', x)
+        print('y: ', y)
         print('offset: ', offset)
+        print('width: ', width)
+        print('height: ', height)
 
         print('x_: ', x_)
         print('y_: ', y_)
 
         x = (x-offset)//x_
-        y = meta['cols'] - 1 - y//y_
+        y = (y-offset)//y_
 
         i = int(x+meta['cols']*y)
         print(i)
@@ -143,17 +155,27 @@ class Images_Parent:
 
     def __init__(self, group, images, next_id):
         self.images = images
+        self.zoo_map = None
         # TODO load existing structure to not duplicate ids
         self.next_id = next_id
         self.group = group
 
     def __str__(self):
-        s = 'group %d images %d metadata %s' % \
-            (self.group, len(self.images), self.metadata())
+        s = 'group %s images %d metadata %s' % \
+            (str(self.group), len(self.images), self.metadata())
         return s
 
     def __repr__(self):
         return str(self)
+
+    def get_zoo(self, zoo_id):
+        if self.zoo_map is None:
+            zoo_map = {}
+            for i in self.iter():
+                if i.zoo_id:
+                    zoo_map[i.zoo_id] = i.id
+            self.zoo_map = zoo_map
+        return self.images[self.zoo_map[zoo_id]]
 
     def iter(self):
         for image in self.list():
@@ -163,11 +185,12 @@ class Images_Parent:
         return list(self.images.values())
 
     @classmethod
-    def load_group(cls, group):
+    def load_group(cls, group, fname=None):
         """
         Load Images object from group entry in structures json file
         """
-        fname = cls._fname()
+        if fname is None:
+            fname = cls._fname()
         if os.path.isfile(fname):
             with open(fname, 'r') as file:
                 data = json.load(file)
@@ -477,3 +500,17 @@ class Random_Images(Images):
         self.next_id = i
         self.images = images
         return images
+
+
+class MultiGroupImages(Images_Parent):
+
+    def __init__(self, groups):
+        images = {}
+
+        for g in groups:
+            i = Images.load_group(g)
+            images.update(i.images)
+        super().__init__(groups, images, None)
+
+    def save_group(self):
+        raise Exception('Can\'t save this type of images')
