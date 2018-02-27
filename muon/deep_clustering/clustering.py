@@ -69,6 +69,9 @@ class Config:
 
 
 class Prediction:
+    """
+    Stores and analyzes machine predictions given the real subject labels
+    """
     def __init__(self, order, labels, y_pred, subjects, config):
         self.order = np.array(order)
         self.labels = labels
@@ -137,6 +140,10 @@ class Prediction:
 
 
 class FeatureSpace:
+    """
+    Analyze how the clusters are structured. Looking at how far away
+    each subject is from the cluster center
+    """
     def __init__(self, model, subjects, pred, config):
         self.model = model
         self.subjects = subjects
@@ -257,11 +264,24 @@ class Cluster:
             self._predictions = self._predict()
         return self._predictions
 
-    def _predict(self):
+    def predict_labels(self, labels):
+        """
+        Create prediction object if we have valid labels
+
+        labels: {subject: label}
+        """
+        # Create list from mapping in same order as subjects
+        # labels = [labels[s.id] for s in self.subjects.list()]
+        self._predictions = self._predict(labels)
+        return self._predictions
+
+    def _predict(self, labels=None):
         subjects = self.subjects
         # TODO remove labels
         # TODO pass rotations to Prediction object for analysis.
         order, charges, rotations = subjects.get_charge_array(rotation=True)
+        if labels:
+            labels = [labels[s] for s in order]
 
         path = os.path.join(self.config.save_dir, 'DEC_model_final.h5')
         if os.path.isfile(path):
@@ -272,7 +292,7 @@ class Cluster:
             y_pred = self._dec_predict(charges, None)
 
         # TODO fix labels used for predictions
-        return Prediction(order, None, y_pred,
+        return Prediction(order, labels, y_pred,
                           self.subjects, self.config)
 
     def _dec_predict(self, charges, labels):
