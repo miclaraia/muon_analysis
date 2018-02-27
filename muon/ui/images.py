@@ -84,12 +84,16 @@ def generate(config, group, path):
 @images.command()
 @click.argument('group', type=int)
 @click.option('--config', nargs=1)
-def load(group, config):
+@click.option('--structure', nargs=1)
+def load(group, config, structure):
     if config:
         config = Config.load(config)
         subjects = pickle.load(open(config.subjects, 'rb'))
 
-    images = Random_Images.load_group(group)
+    if structure:
+        images = Random_Images.load_group(group, fname=structure)
+    else:
+        images = Random_Images.load_group(group)
     print(images)
     interact(locals())
 
