@@ -2,6 +2,7 @@
 from muon.ui import ui
 from muon.deep_clustering.clustering import Config, Cluster
 from muon.project.images import Images, Random_Images
+import muon.project.parse_export as pe
 import muon.project.panoptes as panoptes
 import muon.config
 
@@ -132,4 +133,27 @@ def list():
     print(' '.join(groups))
 
 
+@images.command()
+@click.argument('name')
+@click.argument('groups')
+@click.argument('csvdump')
+@click.option('--subject_file')
+def zoo_export(name, groups, csvdump, subject_file):
+    groups = [int(i) for i in groups.split(',')]
+    kwargs = {
+        'launch_date': '2018-02-15',
+        'image_groups': groups,
+    }
 
+    if subject_file:
+        kwargs['subject_path'] = subject_file
+
+    config = pe.Config(**kwargs)
+
+    export = pe.Parse(name, config)
+    export.parse(csvdump)
+
+    agg = pe.Aggregate.from_parse(export)
+    agg()
+
+    code.interact(local={**globals(), **locals()})
