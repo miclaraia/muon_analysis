@@ -1,3 +1,5 @@
 
+import os
+
 cmap = 'jet'
-project = 5918
+project = os.environ.get('MUON_PROJECT', 5918)
