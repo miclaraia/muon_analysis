@@ -15,11 +15,12 @@ import string
 
 class Subject:
 
-    def __init__(self, subject, event, charge):
+    def __init__(self, subject, event, charge, label=-1):
         self.id = subject
         self.event = event
         self.charge = np.array(charge)
         self.scaled_charge = None
+        self.label = label
 
         self._normalize()
 
@@ -255,39 +256,55 @@ class Subjects:
     ###   Subject Charge Data   ##############################################
     ##########################################################################
 
-    def get_charge_array(self, rotation=False):
+    def get_charge_array(self, order=True, rotation=False, labels=False):
         if rotation:
-            return self._rotated_charge_array()
+            return self._rotated_charge_array(order, labels)
         subjects = self.list()
-        order = []
 
         dimensions = self.dimensions
         charges = np.zeros(dimensions)
+        _order = np.zeros(dimensions[0])
+        _labels = np.zeros(dimensions[0])
 
         for i, subject in enumerate(subjects):
-            order.append(subject.id)
+            _order[i] = subject.id
+            _labels[i] = subject.label
             charges[i] = subject.scaled_charge
 
-        return order, charges
+        out = [charges]
+        if order:
+            out = [_order] + out
+        if labels:
+            out += [_labels]
+        return tuple(out)
 
-    def _rotated_charge_array(self):
+    def _rotated_charge_array(self, order=True, labels=False):
         dimensions = self.dimensions
         dimensions = (dimensions[0]*6, dimensions[1])
 
         cr = CameraRotate()
-        order = []
-        rotation = []
         charges = np.zeros(dimensions)
-        for i, subject in enumerate(self.list()):
-            order += [subject.id for i in range(6)]
-            rotation += list(range(6))
+        _order = np.zeros(dimensions[0])
+        _labels = np.zeros(dimensions[0])
+        rotation = []
+        for n, subject in enumerate(self.list()):
+            i = n*6
+            _order[i:i+6] = subject.id
+            _labels[i:i+6] = subject.label
+            rotation[i:i+6] = range(6)
 
             charge = subject.scaled_charge
-            charges[i*6] = charge
-            for n in range(1, 6):
-                charges[i*6 + n] = cr.rotate(charge, n)
+            charges[i] = charge
+            for m in range(1, 6):
+                charges[i + m] = cr.rotate(charge, m)
 
-        return order, charges, rotation
+        out = [charges]
+        if order:
+            out = [_order] + out
+        if labels:
+            out += [_labels]
+        out += [rotation]
+        return tuple(out)
 
     ##########################################################################
     ###   Operator Overloading   #############################################

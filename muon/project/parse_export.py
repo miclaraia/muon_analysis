@@ -38,25 +38,25 @@ class Config:
         return datetime.strptime(self.launch_date, fmt)
 
 
-class Clusters:
+# class Clusters:
 
-    def __init__(self, name, cluster, agg=None, data=None):
-        self.name = name
-        self.cluster = cluster
+    # def __init__(self, name, cluster, agg=None, data=None):
+        # self.name = name
+        # self.cluster = cluster
 
-        if data is None:
-            data = {}
-        self.data = data
+        # if data is None:
+            # data = {}
+        # self.data = data
 
-        self.agg = agg
+        # self.agg = agg
 
-    def __call__(self):
-        agg = self.agg
-        if agg is None:
-            agg = Aggregate.load(self.name)
+    # def __call__(self):
+        # agg = self.agg
+        # if agg is None:
+            # agg = Aggregate.load(self.name)
 
-        labels = agg.subject_labels()
-        self.cluster.predict_labels(labels)
+        # labels = agg.subject_labels()
+        # self.cluster.predict_labels(labels)
 
         
 

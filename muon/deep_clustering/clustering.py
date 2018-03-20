@@ -6,12 +6,15 @@ from time import time
 import json
 
 import numpy as np
+from sklearn.metrics import f1_score
 from keras.optimizers import SGD
 from keras.utils import np_utils
 import dec_keras as dk
 import matplotlib.pyplot as plt
 import pandas as pd
 
+import logging
+logger = logging.getLogger(__name__)
 
 # this is chosen based on prior knowledge of classes in the data set.
 # n_clusters = 10
@@ -38,6 +41,7 @@ class Config:
         self.tol = kwargs.get('tol', .001)
         self.maxiter = kwargs.get('maxiter', 2e4)
         self.update_interval = kwargs.get('update_interval', 140)
+        self.rotation = kwargs.get('rotation', False)
 
         self.save_dir = os.path.abspath(save_dir)
 
@@ -72,9 +76,9 @@ class Prediction:
     """
     Stores and analyzes machine predictions given the real subject labels
     """
-    def __init__(self, order, labels, y_pred, subjects, config):
+    def __init__(self, order, y, y_pred, subjects, config):
         self.order = np.array(order)
-        self.labels = labels
+        self.y = y
         self.y_pred = y_pred
         self._subjects = subjects
         self.config = config
@@ -92,8 +96,17 @@ class Prediction:
         subjects = self.order[subjects]
         return self._subjects.subset(subjects)
 
+    @property
+    def predict_class(self):
+        pred = np.zeros(len(self.y_pred))
+        mapping = self.cluster_mapping['majority_class']
+        for i, c in enumerate(self.y_pred):
+            pred[i] = mapping[c]
+
+        return pred
+
     def _make_cluster_mapping(self):
-        y = self.labels
+        y = self.y
         if y is None:
             y = [-1 for i in self.order]
 
@@ -240,7 +253,9 @@ class Cluster:
         Initialize the dec model and train
         """
         config = self.config
-        _, X, _ = self.subjects.get_charge_array(rotation=True)
+        X = self.subjects.get_charge_array(
+            order=False, labels=False, rotation=config.rotation)
+        X = X[0]
         self.dec.initialize_model(**{
             'optimizer': SGD(lr=config.lr, momentum=config.momentum),
             'ae_weights': config.ae_weights,
@@ -264,7 +279,7 @@ class Cluster:
             self._predictions = self._predict()
         return self._predictions
 
-    def predict_labels(self, labels):
+    def predict_labels(self):
         """
         Create prediction object if we have valid labels
 
@@ -272,16 +287,24 @@ class Cluster:
         """
         # Create list from mapping in same order as subjects
         # labels = [labels[s.id] for s in self.subjects.list()]
-        self._predictions = self._predict(labels)
+        self._predictions = self._predict()
         return self._predictions
 
-    def _predict(self, labels=None):
+    def _predict(self, subset=None):
         subjects = self.subjects
+        if subset:
+            subjects = subjects.subset(subset)
         # TODO remove labels
         # TODO pass rotations to Prediction object for analysis.
-        order, charges, rotations = subjects.get_charge_array(rotation=True)
-        if labels:
-            labels = [labels[s] for s in order]
+        data = subjects.get_charge_array(
+            labels=True, rotation=False)
+        order = data[0]
+        charges = data[1]
+        labels = data[2]
+
+        if -1 in labels:
+            logger.warning('found -1 in labels, not using labels')
+            labels = None
 
         path = os.path.join(self.config.save_dir, 'DEC_model_final.h5')
         if os.path.isfile(path):
@@ -319,3 +342,12 @@ class Cluster:
             print("No labels to predict clustering accuracy")
         return y_pred
 
+    def accuracy(self, subset=None):
+        subjects = self.subjects
+        if subset:
+            subjects = subjects.subset(subset)
+        x, y = subjects.get_charge_array(
+            order=False, labels=True, rotation=False)
+        y_pred = self._predict(subset).predict_class
+
+        return f1_score(y, y_pred)
