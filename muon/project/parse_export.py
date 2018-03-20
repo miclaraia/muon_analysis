@@ -148,6 +148,10 @@ class Aggregate:
                 subjects[s] = 0
         return subjects
 
+    def apply_labels(self, subjects):
+        labels = self.subject_labels()
+        for s, l in labels.items():
+            subjects[s].label = l
 
     @staticmethod
     def _annotate_i(images, image, muons, total):
