@@ -249,19 +249,68 @@ class Cluster:
         return cls(dec, subjects, config)
 
     def train(self):
-        """
-        Initialize the dec model and train
-        """
+        raise DeprecationWarning('Deprecated, use initialize()')
+
+    def initialize(self):
         config = self.config
-        X = self.subjects.get_charge_array(
+        data = self.subjects.get_charge_array(
             order=False, labels=False, rotation=config.rotation)
-        X = X[0]
+        x = data[0]
         self.dec.initialize_model(**{
             'optimizer': SGD(lr=config.lr, momentum=config.momentum),
             'ae_weights': config.ae_weights,
-            'x': X
+            'x': x
         })
         print(self.dec.model.summary())
+
+        # Try to load clustering weights
+        path = os.path.join(self.config.save_dir, 'DEC_model_final.h5')
+        if os.path.isfile(path):
+            self.dec.load_weights(path)
+
+    def train_clusters(self):
+        """
+        Train the clustering layer
+        """
+        data = self.subjects.get_charge_array(
+            labels=True, order=False, rotation=self.config.rotation)
+        x, y = data[:2]
+
+        t0 = time()
+        y_pred = self.dec.clustering(x, y=y, **{
+            'tol': self.config.tol,
+            'maxiter': self.config.maxiter,
+            'update_interval': self.config.update_interval,
+            'save_dir': self.config.save_dir
+        })
+
+        print('clustering time: %.2f' % (time() - t0))
+
+        # TODO doesn't work without labels
+        if y is not None:
+            accuracy = dk.cluster_acc(y, y_pred)
+            print(accuracy)
+        else:
+            print("No labels to predict clustering accuracy")
+        return y_pred
+
+    def predict(self, subset=None):
+        """
+        Predict cluster for a set of subjects
+        """
+        subjects = self.subjects
+        if subset:
+            subjects = subjects.subset(subset)
+
+        data = subjects.get_charge_array(
+            labels=True, order=True, rotation=False)
+        s, x, y = data[:3]
+
+        if -1 in y:
+            logger.warning('found -1 in labels, not using labels')
+            y = None
+        y_pred = self.dec.predict_clusters(x)
+        return Prediction(s, y, y_pred, subjects, self.config)
 
     @property
     def feature_space(self):
@@ -276,71 +325,8 @@ class Cluster:
     @property
     def predictions(self):
         if self._predictions is None:
-            self._predictions = self._predict()
+            self._predictions = self.predict()
         return self._predictions
-
-    def predict_labels(self):
-        """
-        Create prediction object if we have valid labels
-
-        labels: {subject: label}
-        """
-        # Create list from mapping in same order as subjects
-        # labels = [labels[s.id] for s in self.subjects.list()]
-        self._predictions = self._predict()
-        return self._predictions
-
-    def _predict(self, subset=None):
-        subjects = self.subjects
-        if subset:
-            subjects = subjects.subset(subset)
-        # TODO remove labels
-        # TODO pass rotations to Prediction object for analysis.
-        data = subjects.get_charge_array(
-            labels=True, rotation=False)
-        order = data[0]
-        charges = data[1]
-        labels = data[2]
-
-        if -1 in labels:
-            logger.warning('found -1 in labels, not using labels')
-            labels = None
-
-        path = os.path.join(self.config.save_dir, 'DEC_model_final.h5')
-        if os.path.isfile(path):
-            self.dec.load_weights(path)
-            y_pred = self.dec.predict_clusters(charges)
-        else:
-            # TODO _dec_predict calls for labels, but we hae none
-            y_pred = self._dec_predict(charges, None)
-
-        # TODO fix labels used for predictions
-        return Prediction(order, labels, y_pred,
-                          self.subjects, self.config)
-
-    def _dec_predict(self, charges, labels):
-        """
-        Pass known x and y labels to the dec clustering method
-        to train the clustering algorithm
-        """
-
-        t0 = time()
-        y_pred = self.dec.clustering(charges, y=labels, **{
-            'tol': self.config.tol,
-            'maxiter': self.config.maxiter,
-            'update_interval': self.config.update_interval,
-            'save_dir': self.config.save_dir
-        })
-
-        print('clustering time: %.2f' % (time() - t0))
-
-        # TODO doesn't work without labels
-        if labels is not None:
-            accuracy = dk.cluster_acc(labels, y_pred)
-            print(accuracy)
-        else:
-            print("No labels to predict clustering accuracy")
-        return y_pred
 
     def accuracy(self, subset=None):
         subjects = self.subjects
@@ -348,6 +334,6 @@ class Cluster:
             subjects = subjects.subset(subset)
         x, y = subjects.get_charge_array(
             order=False, labels=True, rotation=False)
-        y_pred = self._predict(subset).predict_class
+        y_pred = self.predict(subset).predict_class
 
         return f1_score(y, y_pred)
