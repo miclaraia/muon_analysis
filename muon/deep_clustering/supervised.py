@@ -9,6 +9,7 @@ from keras.layers import Dense
 from keras.models import Sequential
 from keras.callbacks import ModelCheckpoint
 from keras.utils import np_utils
+from sklearn.metrics import f1_score
 
 from muon.utils.camera import CameraRotate
 import muon.data
@@ -55,8 +56,29 @@ class Supervised:
     def save(self):
         self.model.save_weights(self.config.ae_weights, True)
 
+    @classmethod
+    def load(cls, config):
+        model = cls(config)
+        model.model.load_weights(config.ae_weights)
+        return model
+
+    def score(self, subjects):
+        rotation = self.config.rotation
+        xy = self.get_xy_subsets(subjects, rotation)
+
+        logger.debug('xy: %s', xy)
+
+        scores = {}
+        for k in xy:
+            y_prob = self.model.predict(xy[k][0])
+            y_pred= y_prob.argmax(axis=-1)
+            logger.debug('%s y_prob: %s\ny_pred: %s', k, y_prob, y_pred)
+            scores[k] = f1_score(xy[k][1], y_pred)
+
+        return scores
+
     @staticmethod
-    def get_xy(subjects, rotation):
+    def get_xy(subjects, rotation, hot_encode=False):
         x = []
         y = []
         cr = CameraRotate()
@@ -70,20 +92,26 @@ class Supervised:
                 y.append(s.label)
 
         x = np.array(x)
-        y = np_utils.to_categorical(np.array(y), 2)
+        y = np.array(y)
+        if hot_encode:
+            y = np_utils.to_categorical(y, 2)
         return x, y
+
+    def get_xy_subsets(self, subjects, rotation, hot_encode=False):
+        data = {}
+        for k in self.subsets:
+            subset = subjects.subset(self.subsets[k])
+            data[k] = self.get_xy(subset, rotation, hot_encode)
+        return data
 
 
     def train(self, subjects):
         rotation = self.config.rotation
         epochs = self.config.epochs
 
-        def subsets(key):
-            subset = subjects.subset(self.subsets[key])
-            return self.get_xy(subset, rotation)
-
-        train = subsets('train')
-        validate = subsets('validate')
+        xy = self.get_xy_subsets(subjects, rotation, hot_encode=True)
+        train = xy['train']
+        validate = xy['validate']
 
         callbacks = [
             ModelCheckpoint(

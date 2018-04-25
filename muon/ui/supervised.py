@@ -26,20 +26,26 @@ def interact(local):
     code.interact(local={**globals(), **locals(), **local})
 
 
+def load_subjects(fname):
+    with open(fname, 'rb') as file:
+        subjects = pickle.load(file)
+    logger.info('Done loading subjects')
+
+    agg = pe.Aggregate.load('mh2_gold')
+    _s = list(agg.data['subjects'].keys())
+    subjects = subjects.subset(_s)
+    agg.apply_labels(subjects)
+    return subjects
+
+
+
 @supervised.command()
 @click.argument('output', nargs=1)
 @click.argument('subjects', nargs=1)
 @click.option('--ae-weights', nargs=1)
 def run(output, subjects, ae_weights):
 
-    with open(subjects, 'rb') as file:
-        subjects_ = pickle.load(file)
-    logger.info('Done loading subjects')
-
-    agg = pe.Aggregate.load('mh2_gold')
-    _s = list(agg.data['subjects'].keys())
-    subjects_ = subjects_.subset(_s)
-    agg.apply_labels(subjects_)
+    subjects_ = load_subjects(subjects)
 
     config = Config(**{
         'input_shape': subjects_.dimensions,
@@ -59,4 +65,18 @@ def run(output, subjects, ae_weights):
     model.train(subjects_)
 
     code.interact(local={**globals(), **locals()})
+
+
+@supervised.command()
+@click.argument('config', nargs=1)
+def load(config):
+    config = Config.load(config)
+    subjects = load_subjects(config.subjects)
+    model = Supervised.load(config)
+
+    logger.info('scores with rotation: %s', model.score(subjects))
+    config.rotation = False
+    logger.info('scores without rotation: %s', model.score(subjects))
+
+    interact(locals())
 
