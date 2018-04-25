@@ -96,6 +96,10 @@ class Subjects:
     def _sample_s(self, size):
         return self.__class__(self.sample(size))
 
+    def iter(self):
+        for s in self.subjects.values():
+            yield s
+
     def list(self):
         return list(self.subjects.values())
 
