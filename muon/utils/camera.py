@@ -162,6 +162,9 @@ class CameraRotate:
         return self._data
 
     def rotate(self, coords, n):
+        if n == 0:
+            return coords
+
         new = np.zeros_like(coords)
         for i in self.data[n]:
             j = self.data[n][i]
