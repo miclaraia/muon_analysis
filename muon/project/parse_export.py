@@ -14,7 +14,7 @@ class Config:
     def __init__(self, image_groups, launch_date, **kwargs):
         self.tool_name = kwargs.get('tool_name', 'Tool name')
         self.task_A = kwargs.get('task_A', 'T0')
-        self.task_B = kwargs.get('task_B', ['T1', 'T2'])
+        self.task_B = kwargs.get('task_B', ['T1', 'T3'])
         self.launch_date = launch_date
         self.time_format = '%Y-%m-%d %H:%M:%S %Z'
         self.image_groups = image_groups

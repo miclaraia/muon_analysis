@@ -64,6 +64,7 @@ def run(output, subjects, ae_weights):
     logger.info('Training model')
     model.train(subjects_)
 
+    model.save()
     code.interact(local={**globals(), **locals()})
 
 
