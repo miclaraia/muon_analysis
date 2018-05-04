@@ -26,12 +26,13 @@ def interact(local):
     code.interact(local={**globals(), **locals(), **local})
 
 
-def load_subjects(fname):
+def load_subjects(config):
+    fname = config.subjects
     with open(fname, 'rb') as file:
         subjects = pickle.load(file)
     logger.info('Done loading subjects')
 
-    agg = pe.Aggregate.load('mh2_gold')
+    agg = pe.Aggregate.load(config.label_source)
     _s = list(agg.data['subjects'].keys())
     subjects = subjects.subset(_s)
     agg.apply_labels(subjects)
@@ -45,24 +46,27 @@ def load_subjects(fname):
 @click.option('--ae-weights', nargs=1)
 def run(output, subjects, ae_weights):
 
-    subjects_ = load_subjects(subjects)
-
     config = Config(**{
-        'input_shape': subjects_.dimensions,
+        'input_shape': (None, 499),
         'loss': 'categorical_crossentropy',
-        'optimizer': 'adam',
+        'optimizer': 'sgd',
+        'lr': 1e-3,
+        'epochs': 1000,
+        'patience': 50,
         'rotation': True,
         'save_dir': output,
         'ae_weights': ae_weights,
         'subjects': subjects,
+        'label_source': 'mh2_gold',
     })
     logger.info(config)
     config.dump()
+    subjects = load_subjects(config)
 
 
     model = Supervised(config)
     logger.info('Training model')
-    model.train(subjects_)
+    model.train(subjects)
 
     code.interact(local={**globals(), **locals()})
 
