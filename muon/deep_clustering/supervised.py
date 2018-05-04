@@ -7,8 +7,9 @@ import csv
 
 from keras.layers import Dense
 from keras.models import Sequential
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.utils import np_utils
+from keras import optimizers
 from sklearn.metrics import f1_score
 
 from muon.utils.camera import CameraRotate
@@ -37,6 +38,9 @@ class Supervised:
     def init_model(self):
         input_shape = (None, self.config.input_shape[1])
         optimizer = self.config.optimizer
+        if optimizer == 'sgd':
+            lr = self.config.lr
+            optimizer = optimizers.SGD(lr=lr)
         loss = self.config.loss
 
         model = Sequential()
@@ -71,7 +75,7 @@ class Supervised:
         scores = {}
         for k in xy:
             y_prob = self.model.predict(xy[k][0])
-            y_pred= y_prob.argmax(axis=-1)
+            y_pred = y_prob.argmax(axis=-1)
             logger.debug('%s y_prob: %s\ny_pred: %s', k, y_prob, y_pred)
             scores[k] = f1_score(xy[k][1], y_pred)
 
@@ -108,6 +112,7 @@ class Supervised:
     def train(self, subjects):
         rotation = self.config.rotation
         epochs = self.config.epochs
+        patience = self.config.patience
 
         xy = self.get_xy_subsets(subjects, rotation, hot_encode=True)
         train = xy['train']
@@ -116,8 +121,11 @@ class Supervised:
         callbacks = [
             ModelCheckpoint(
                 self.config.checkpoint, monitor='val_loss',
-                save_best_only=True, mode='min')
-            ]
+                save_best_only=True, mode='min'),
+            EarlyStopping(
+                monitor='val_loss', min_delta=0, patience=patience,
+                verbose=0, mode='min'),
+        ]
 
         model = self.model
         model.fit(*train, validation_data=validate, epochs=epochs,
@@ -126,12 +134,14 @@ class Supervised:
 
 class Config:
     def __init__(self, input_shape, save_dir, loss=None, optimizer=None,
-                 rotation=False, **kwargs):
+                 lr=None, rotation=False, **kwargs):
         self.loss = loss or 'categorical_crossentropy'
         self.optimizer = optimizer or 'adam'
+        self.lr = lr
         self.input_shape = input_shape
         self.rotation = rotation
         self.epochs = kwargs.get('epochs', 100)
+        self.patience = kwargs.get('patience', 10)
 
         save_dir = save_dir or muon.data.dir()
         self.save_dir = os.path.abspath(save_dir)
@@ -139,6 +149,7 @@ class Config:
         subjects = os.path.join(save_dir, 'subjects.pkl')
         subjects = kwargs.get('subjects', subjects)
         self.subjects = os.path.abspath(subjects)
+        self.label_source = kwargs.get('label_source', 'mh2_gold')
 
         ae_weights = kwargs.get('ae_weights', None)
         if ae_weights is None:
