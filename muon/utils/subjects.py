@@ -260,6 +260,53 @@ class Subjects:
     ###   Subject Charge Data   ##############################################
     ##########################################################################
 
+    def get_xy_volunteer(self, labels, rotation):
+        x = []
+        y = []
+        cr = CameraRotate()
+        for s in self.iter():
+            for l in labels[s.id]:
+                if rotation:
+                    n = 6
+                else:
+                    n = 1
+                for n in range(n):
+                    x.append(cr.rotate(s.scaled_charge, n))
+                    y.append(l)
+        x = np.array(x)
+        y = np.array(y)
+        return x, y
+
+    def get_xy(self, labels, rotation):
+        x = []
+        y = []
+        cr = CameraRotate()
+        for s in self.iter():
+            label = labels[s.id]
+            if rotation:
+                for n in range(6):
+                    x.append(cr.rotate(s.scaled_charge, n))
+                    y.append(label)
+            else:
+                x.append(s.scaled_charge)
+                y.append(label)
+
+        x = np.array(x)
+        y = np.array(y)
+        return x, y
+
+    def get_x(self, rotation):
+        x = []
+        cr = CameraRotate()
+        for s in self.iter():
+            if rotation:
+                n = 6
+            else:
+                n = 1
+            for n in range(n):
+                x.append(cr.rotate(s.scaled_charge, n))
+        return np.array(x)
+
     def get_charge_array(self, order=True, rotation=False, labels=False):
         if rotation:
             return self._rotated_charge_array(order, labels)

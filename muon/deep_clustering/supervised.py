@@ -14,6 +14,7 @@ from sklearn.metrics import f1_score
 
 from muon.utils.camera import CameraRotate
 import muon.data
+import muon.deep_clustering.utils as utils
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +75,8 @@ class Supervised:
 
         scores = {}
         for k in xy:
-            y_prob = self.model.predict(xy[k][0])
-            y_pred = y_prob.argmax(axis=-1)
-            logger.debug('%s y_prob: %s\ny_pred: %s', k, y_prob, y_pred)
-            scores[k] = f1_score(xy[k][1], y_pred)
+            y_prob = self.model.predict(xy[k][0])[:, 1]
+            scores[k] = utils.score(y_prob, xy[k][1], 0.95)
 
         return scores
 

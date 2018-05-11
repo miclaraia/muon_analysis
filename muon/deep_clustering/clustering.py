@@ -1,17 +1,24 @@
 
-from muon.utils.subjects import Subjects
 
 import os
 from time import time
 import json
+import pandas as pd
 
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors
+from matplotlib.colors import LinearSegmentedColormap
+
 from sklearn.metrics import f1_score
+from sklearn.decomposition import PCA
+
+from keras import backend as K
 from keras.optimizers import SGD
 from keras.utils import np_utils
+
 import dec_keras as dk
-import matplotlib.pyplot as plt
-import pandas as pd
+from muon.utils.subjects import Subjects
 
 import logging
 logger = logging.getLogger(__name__)
@@ -76,25 +83,21 @@ class Prediction:
     """
     Stores and analyzes machine predictions given the real subject labels
     """
-    def __init__(self, order, y, y_pred, subjects, config):
-        self.order = np.array(order)
+    def __init__(self, sid, y, y_pred, subjects, n_clusters):
+        self.sid = sid
         self.y = y
         self.y_pred = y_pred
         self._subjects = subjects
-        self.config = config
+        self.n_clusters = n_clusters
 
-        # self.cluster_mapping = self._make_cluster_mapping()
         self.cluster_mapping = self._make_cluster_mapping()
 
-    def subjects(self):
-        subjects = self._subjects
-        subjects = [subjects[s] for s in self.order]
-        return Subjects(subjects)
+    # def subjects(self):
+        # return self._subjects.subset(self.sid)
 
     def cluster_subjects(self, cluster):
         subjects = np.where(self.y_pred == cluster)[0]
-        subjects = self.order[subjects]
-        return self._subjects.subset(subjects)
+        return self._subjects.subset(self.sid[subjects])
 
     @property
     def predict_class(self):
@@ -108,11 +111,11 @@ class Prediction:
     def _make_cluster_mapping(self):
         y = self.y
         if y is None:
-            y = [-1 for i in self.order]
+            y = [-1 for i in self.sid]
 
         y_pred = self.y_pred
         n_classes = len(np.unique(y))
-        n_clusters = self.config.n_clusters
+        n_clusters = self.n_clusters
 
         one_hot_encoded = np_utils.to_categorical(y, n_classes)
 
@@ -251,7 +254,7 @@ class Cluster:
     def train(self):
         raise DeprecationWarning('Deprecated, use initialize()')
 
-    def initialize(self):
+    def initialize(self, verbose=False):
         config = self.config
         data = self.subjects.get_charge_array(
             order=False, labels=False, rotation=config.rotation)
@@ -261,7 +264,8 @@ class Cluster:
             'ae_weights': config.ae_weights,
             'x': x
         })
-        print(self.dec.model.summary())
+        if verbose:
+            print(self.dec.model.summary())
 
         # Try to load clustering weights
         path = os.path.join(self.config.save_dir, 'DEC_model_final.h5')
@@ -310,7 +314,7 @@ class Cluster:
             logger.warning('found -1 in labels, not using labels')
             y = None
         y_pred = self.dec.predict_clusters(x)
-        return Prediction(s, y, y_pred, subjects, self.config)
+        return Prediction(s, y, y_pred, subjects, self.config.n_clusters)
 
     @property
     def feature_space(self):
@@ -337,3 +341,122 @@ class Cluster:
         y_pred = self.predict(subset).predict_class
 
         return f1_score(y, y_pred)
+
+    @staticmethod
+    def euclidian_distance(vects):
+        x, y = vects
+        return K.sqrt(K.maximum(K.sum(K.square(x - y), axis=1, keepdims=True), \
+                                K.epsilon()))
+
+    def cluster_distance(self, x):
+        x_encoded = self.dec.encoder.predict(x)
+        x_encoded_tiled = np.tile(
+            x_encoded[:,:,np.newaxis],
+            (1, 1, self.dec.n_clusters)
+        )
+        cluster_centres = self.get_cluster_centres().T
+        cluster_centres_tiled = np.tile(
+            cluster_centres[np.newaxis, :, :],
+            (x.shape[0], 1, 1)
+        )
+
+        def euclidean_distance(vects):
+            x, y = vects
+            print(x.shape, y.shape)
+            N = K.sum(K.square(x - y), axis=1, keepdims=True)
+            N = K.sqrt(K.maximum(N, K.epsilon()))
+            return N
+
+        euclidean_distances = np.squeeze(K.eval(euclidean_distance(
+            (x_encoded_tiled, cluster_centres_tiled)
+        )))
+
+        print(euclidean_distances.shape)
+        return euclidean_distances
+
+    def get_cluster_assignment(self, x, y):
+        cluster_preds = self.dec.predict_clusters(x)
+        cluster_distances = self.cluster_distance(x)
+        cluster_mapping = list(self.predictions. \
+                          cluster_mapping['majority_class'])
+
+        y_assign = []
+        for i in range(x.shape[0]):
+            l = y[i]
+            c = cluster_preds[i]
+            if l == cluster_mapping[c]:
+                # easy, already the right cluster
+                y_assign.append(c)
+            else:
+                # need to assign to the closest cluster with the right label
+                # euclidean distance
+                ed = cluster_distances[i][[np.where(cluster_mapping == l)]]
+                # assigned cluster
+                ac = np.array(cluster_mapping)[np.where(cluster_mapping == l)]
+                ac = int(ac[np.argmin(ed)])
+                y_assign.append(ac)
+
+        return y_assign
+
+    def get_cluster_centres(self):
+        cluster_centers = self.dec.model.get_layer(name='clustering')
+        cluster_centers = cluster_centers.get_weights()
+        cluster_centers = np.squeeze(np.array(cluster_centers))
+        return cluster_centers
+
+    def pca_plot(self):
+        x = self.subjects.get_x(False)
+        y = self.dec.predict_clusters(x)
+        cluster_centers = self.dec.model.get_layer(name='clustering')
+        cluster_centers = cluster_centers.get_weights()
+        cluster_centers = np.squeeze(np.array(cluster_centers))
+
+        labels = [str(i) for i in range(self.config.n_clusters)]
+        return self._pca_plot(x, cluster_centers, y, labels=labels)
+
+    def _pca_plot(self, x, cluster_centres, y=None, labels=[],
+                  ulcolour='#747777', ccolour='#4D6CFA'):
+        base_network = self.dec.encoder
+
+        pca = PCA(n_components=2)
+        x_pca = pca.fit_transform(base_network.predict(x))
+        #c_pca = pca.transform(cluster_centres)
+
+        fig = plt.figure(figsize=(6, 6))
+        ax = fig.add_subplot(111)
+
+        if np.any(y):
+            unique_targets = list(np.unique(y))
+            cmap = discrete_cmap(len(unique_targets), 'jet')
+            norm = matplotlib.colors.BoundaryNorm(
+                np.arange(0, max(unique_targets), 1), cmap.N)
+
+            if -1 in unique_targets:
+                _x = x_pca[np.where(y == -1), 0]
+                _y = x_pca[np.where(y == -1), 1]
+                ax.scatter(_x, _y, marker='o', s=20, c=ulcolour, alpha=0.1)
+                unique_targets.remove(-1)
+            for l in unique_targets:
+                _x = x_pca[np.where(y == l), 0]
+                _y = x_pca[np.where(y == l), 1]
+                _c = l * np.ones(_x.shape)
+                ax.scatter(_x, _y, marker='o', s=5, c=_c,
+                           cmap=cmap, norm=norm, alpha=0.2, label=labels[l])
+
+        else:
+            ax.scatter(x_pca[:,0], x_pca[:,1], marker='o', s=20, \
+                color=ulcolour, alpha=0.1)
+        plt.axis('off')
+
+
+def discrete_cmap(N, base_cmap=None):
+    """Create an N-bin discrete colormap from the specified input map"""
+
+    # Note that if base_cmap is a string or None, you can simply do
+    #    return plt.cm.get_cmap(base_cmap, N)
+    # The following works for string, None, or a colormap instance:
+
+    base = plt.cm.get_cmap(base_cmap)
+    color_list = base(np.linspace(0, 1, N))
+    cmap_name = base.name + str(N)
+    return LinearSegmentedColormap.from_list(cmap_name, color_list, N)

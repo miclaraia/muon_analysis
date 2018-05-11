@@ -138,6 +138,9 @@ class Aggregate:
 
         return images, subjects
 
+    def labeled_subjects(self):
+        return list(self.data['subjects'].keys())
+
     def subject_labels(self):
         _, _subjects = self.reduce()
         subjects = {}

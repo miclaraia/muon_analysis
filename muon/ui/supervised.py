@@ -76,12 +76,9 @@ def run(output, subjects, ae_weights):
 @click.argument('config', nargs=1)
 def load(config):
     config = Config.load(config)
-    subjects = load_subjects(config.subjects)
+    subjects = load_subjects(config)
     model = Supervised.load(config)
-
-    logger.info('scores with rotation: %s', model.score(subjects))
     config.rotation = False
-    logger.info('scores without rotation: %s', model.score(subjects))
 
     interact(locals())
 
