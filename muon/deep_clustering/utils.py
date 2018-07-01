@@ -34,9 +34,10 @@ class SubjectSubset:
         pred = Prediction.generate(cluster, self.subset, self.labels)
         self.pred_cluster = pred.y_pred
         self.pred_class = pred.predict_class
+        cm = np.array(pred.cluster_mapping['majority_class'])
 
         truth = self.y_truth
-        pred = model.predict(self.x)[:, 1]
+        pred = np.sum(model.predict(self.x)[:, np.where(cm == 1)[0]], axis=1)
         self.y_pred = pred
 
         index = list(range(len(pred)))
