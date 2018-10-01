@@ -4,6 +4,7 @@ from swap.db import DB
 import swap.config
 from muon.ui import ui
 
+from tqdm import tqdm
 import argparse
 import csv
 import json
@@ -88,7 +89,7 @@ class SubjectID(MuonMetadata):
     @classmethod
     def collect_data(cls, fname):
         data = {}
-        for subject, evt in cls.get_data(fname):
+        for subject, evt in tqdm(cls.get_data(fname)):
             metadata = {
                 'run': evt[0],
                 'evt': evt[1],
@@ -132,7 +133,7 @@ class SubjectID(MuonMetadata):
         evt = cls.parse_fname(fname)
 
         metadata = subject, evt
-        print(metadata)
+        #print(metadata)
 
         return metadata
 
