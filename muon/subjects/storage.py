@@ -6,6 +6,8 @@ import csv
 from tqdm import tqdm
 
 from muon.subjects import Subject
+from muon.subjects import Subjects
+# TODO use some kind of database instead of hdf
 
 
 class Storage:
@@ -39,6 +41,20 @@ class Storage:
             skipped += self.add_subject(subject)
         return skipped
 
+    def add_labels(self, name, labels):
+        skipped = []
+        hdf = self._file
+        for subject, label in labels:
+            if subject in hdf['subjects'][subject]:
+                hdf_s = hdf['subjects'][subject]
+                s_labels = json.loads(hdf_s.attrs['label'])
+                s_labels[name] = label
+                hdf_s.attrs['label'] = json.dumps(s_labels)
+            else:
+                skipped.append(subject)
+
+        return skipped
+    
     def add_subject(self, subject):
         hdf = self._file
         if subject.id is None:
@@ -110,7 +126,10 @@ class Storage:
     def iter(self):
         hdf = self._file
         for subject in hdf['subjects']:
-            yield self._to_subject(subject, hdf['subjects'[subject]])
+            yield self._to_subject(subject, hdf['subjects'][subject])
+
+    def to_subjects(self):
+        return Subjects(list(self.iter()))
 
     def _to_subject(self, id, hdf_subject):
         charge = hdf_subject['charge'][:]
