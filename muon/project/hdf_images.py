@@ -358,6 +358,10 @@ class HDFImages:
         with h5py.File(self.fname, 'r') as f:
             return ImageGroup.load_hdf(f['groups/group_{}'.format(group)])
 
+    def list_groups(self):
+        with h5py.File(self.fname, 'r') as f:
+            return [group.split('_')[-1] for group in f['groups']]
+
     def save(self, groups=None):
         with h5py.File(self.fname, 'r+') as f:
             f.attrs['next_id'] = self.next_id

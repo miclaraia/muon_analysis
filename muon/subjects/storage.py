@@ -44,14 +44,20 @@ class Storage:
     def add_labels(self, name, labels):
         skipped = []
         hdf = self._file
-        for subject, label in labels:
-            if subject in hdf['subjects'][subject]:
+        for subject, label in tqdm(labels):
+            if subject in hdf['subjects']:
                 hdf_s = hdf['subjects'][subject]
                 s_labels = json.loads(hdf_s.attrs['label'])
+                if s_labels is None:
+                    s_labels = {}
                 s_labels[name] = label
                 hdf_s.attrs['label'] = json.dumps(s_labels)
             else:
                 skipped.append(subject)
+
+        all_labels = json.loads(hdf.attrs['labels'])
+        all_labels[name] = {s: l for s, l in labels}
+        hdf.attrs['labels'] = json.dumps(all_labels)
 
         return skipped
     
@@ -121,11 +127,20 @@ class Storage:
             file = h5py.File(self.fname, 'w')
             file.create_group('subjects')
             file.attrs['next_id'] = 0
+            file.attrs['labels'] = json.dumps({})
             return file
+
+    def get_subject(self, id):
+        subject = self._file['subjects'][id]
+        return self._to_subject(id, subject)
+
+    def get_subjects(self, subjects):
+        subjects = [self.get_subject(s) for s in subjects]
+        return Subjects(subjects)
 
     def iter(self):
         hdf = self._file
-        for subject in hdf['subjects']:
+        for subject in tqdm(hdf['subjects']):
             yield self._to_subject(subject, hdf['subjects'][subject])
 
     def to_subjects(self):
