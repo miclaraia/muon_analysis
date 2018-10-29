@@ -1,26 +1,29 @@
 import numpy as np
 import os
+import logging
+from tqdm import tqdm
+import pickle
 
-from sklearn.metrics import f1_score, roc_curve
+from sklearn.metrics import f1_score
 from sklearn.cluster import KMeans
 from sklearn import metrics
 from sklearn.metrics import homogeneity_score
 
-from keras.models import Model, load_model
-from keras.layers import Input, Dense, Lambda, Dropout
-from keras.initializers import Initializer
-from keras.optimizers import SGD, Adadelta
+from keras.models import Model
+from keras.layers import Input, Dense
 from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping
-from keras.utils import np_utils
-from keras.engine.topology import Layer
 from keras import backend as K
 from keras import regularizers
 # from keras.models import load_model
 
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
+from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
+        calc_f1_score, one_percent_fpr
 
-lcolours = ['#D6FF79', '#B0FF92', '#A09BE7', '#5F00BA', '#56CBF9', \
+lcolours = ['#D6FF79', '#B0FF92', '#A09BE7', '#5F00BA', '#56CBF9',
             '#F3C969', '#ED254E', '#CAA8F5', '#D9F0FF', '#46351D']
+
+logger = logging.getLogger(__name__)
 
 #  DEC constants from DEC paper
 # batch_size = 256
@@ -46,38 +49,50 @@ class MyLossWeightCallback(Callback):
 
 
 class Metrics:
-    _metric_names = ['fom', 'f1', 'f1c', 'h', 'nmi']
+    _metric_names = ['f1', 'f1c', 'h', 'nmi']
 
     def __init__(self):
         self.metrics = []
+
+    @classmethod
+    def _print(cls, metric):
+
+        s = '-------------------------------------------------\n' \
+            '%4d  F1=%.4f  F1c=%.4f  h=%.4f  nmi=%.4f\n' \
+            '     vF1=%.4f vF1c=%.4f vh=%.4f vnmi=%.4f\n' \
+            '      loss=%s\n' \
+            '     vloss=%s\n' \
+            '-------------------------------------------------\n'
+
+        m = (metric['iteration'],
+             *(metric['train'][f] for f in cls._metric_names),
+             *(metric['valid'][f] for f in cls._metric_names),
+             metric['loss'], metric['vloss'])
+        return s % m
+
+    def print_ite(self, iteration):
+        for item in self.metrics:
+            if item['iteration'] == iteration:
+                return self._print(item)
 
     def add(self, iteration, train, valid, loss, vloss):
         metrics = {
             'iteration': iteration,
             'train': {f: train[i] for i, f in enumerate(self._metric_names)},
             'valid': {f: valid[i] for i, f in enumerate(self._metric_names)},
+            'loss': loss,
+            'vloss': vloss
         }
         self.metrics.append(metrics)
-
-        s = '%4d 1%fpr=%.4f  F1=%.4f  F1c=%.4f  h=%.4f  nmi=%.f4\n' \
-            '     v1%fpr=%.4f vF1=%.4f vF1c=%.4f vh=%.4f vnmi=%.4f\n' \
-            '     loss=%s vloss=%s\n'
-
-        m = (len(self.metrics),
-             *(metrics['train'][f] for f in self._metric_names),
-             *(metrics['valid'][f] for f in self._metric_names),
-             loss, vloss)
-        return s % m
+        return self._print(metrics)
 
     def dump(self):
         output = {k: [] for k in [
             'iteration',
-            'train_fom',
             'train_f1',
             'train_f1c',
             'train_h',
             'train_nmi',
-            'valid_fom',
             'valid_f1',
             'valid_f1c',
             'valid_h',
@@ -89,7 +104,11 @@ class Metrics:
                 output['train_{}'.format(f)].append(item['train'][f])
                 output['valid_{}'.format(f)].append(item['valid'][f])
 
-            return output
+        return output
+
+    def save(self, fname):
+        with open(fname, 'wb') as f:
+            pickle.dump(self, f)
 
 
 class MultitaskDEC(DEC):
@@ -112,7 +131,7 @@ class MultitaskDEC(DEC):
     def build_model(self, alpha, beta, gamma, loss, loss_weights):
         cluster_weights = self.model.get_layer(name='clustering').get_weights()
 
-        a = Input(shape=(400,))  # input layer
+        a = Input(shape=(self.dims[0],))  # input layer
 
         self.model.layers[1].kernel_regularizer = regularizers.l2(0.5)
         self.model.layers[2].kernel_regularizer = regularizers.l2(0.5)
@@ -152,13 +171,14 @@ class MultitaskDEC(DEC):
     def clustering(
             self,
             x,
-            y=None,
-            train_dev_data=None,
-            validation_data=None,
+            y,
+            train_dev_data,
+            validation_data,
             tol=1e-3,
             update_interval=140,
             maxiter=2e4,
             save_dir='./results/dec',
+            save_interval=5,
             pretrained_weights=None,
             alpha=K.variable(1.0),
             beta=K.variable(0.0),
@@ -166,8 +186,14 @@ class MultitaskDEC(DEC):
             loss_weight_decay=True,
             loss=None,
             loss_weights=None):
+
+        if not os.path.isdir(save_dir):
+            raise FileNotFoundError(
+                'savedir does not exist\n{}'.format(save_dir))
+        if y is None:
+            logger.warn('No labels provided, won\'t print metrics')
+
         print('Update interval', update_interval)
-        save_interval = x.shape[0] / self.batch_size * 5  # 5 epochs
         print('Save interval', save_interval)
    
         try:
@@ -187,6 +213,7 @@ class MultitaskDEC(DEC):
             get_cluster_to_label_mapping_safe(
                 y[:,1], y_p, self.n_classes, self.n_clusters)
         
+        logger.debug('')
         print(np.argmax((1-np.array(majority_class_fractions))*np.array(n_assigned_list)))
         cluster_to_label_mapping[np.argmax((1-np.array(majority_class_fractions))*np.array(n_assigned_list))] = 1
         
@@ -194,9 +221,11 @@ class MultitaskDEC(DEC):
         ###############################################################
         ###############################################################
 
+        logger.debug('Building Model')
         self.build_model(alpha, beta, gamma, loss, loss_weights)
 
         if not os.path.isdir(save_dir):
+            logger.debug('Save dir doesn\'t exist')
             os.makedirs(save_dir)
    
         loss = [0, 0, 0]
@@ -206,23 +235,23 @@ class MultitaskDEC(DEC):
         self.metrics = Metrics()
 
         best_train_dev_loss = [np.inf, np.inf, np.inf]
+        logger.debug('start training')
         for ite in range(int(maxiter)):
             if ite % update_interval == 0:
                 q = self.model.predict(x, verbose=0)[1]
                 valid_p = self.target_distribution(self.model.predict(validation_data[0], verbose=0)[1])
                 p = self.target_distribution(q)  # update the auxiliary target distribution p
 
-                
                 # evaluate the clustering performance
                 y_pred = q.argmax(1)
                 delta_label = np.sum(y_pred != y_pred_last).astype(np.float32) / y_pred.shape[0]
                 y_pred_last = y_pred
                 y_pred = self.model.predict(x)[0]
                 if y is not None:
+                    logger.debug('Calculating metrics')
                     c_map = get_cluster_to_label_mapping_safe(
                         y[:,1], q.argmax(1), self.n_classes,
                         self.n_clusters, toprint=False)[0]
-                    f = one_percent_fpr(y[:,1], y_pred[:,1], 0.01)[0]
 
                     metrics_train = self._calculate_metrics(x, y, y_pred, c_map)
 
@@ -234,84 +263,39 @@ class MultitaskDEC(DEC):
                         x_valid, [y_valid, valid_p, x_valid])
                     metrics_valid = self._calculate_metrics(
                         x_valid, y_valid, y_pred_valid, c_map)
-                    self.metrics.add(
-                        ite, metrics_train, metrics_valid, loss, val_loss)
+                    print(self.metrics.add(
+                        ite, metrics_train, metrics_valid, loss, val_loss))
                     
-                    train_dev_p = self.target_distribution(self.model.predict(train_dev_data[0], verbose=0)[1])
-                    train_dev_loss = np.round(self.model.test_on_batch(train_dev_data[0], [train_dev_data[1], train_dev_p, train_dev_data[0]]), 5)
-                    if train_dev_loss[1] < best_train_dev_loss[1] and train_dev_loss[-1] < best_train_dev_loss[-1]: # only interested in classification improvements
-                      print('saving model: ', best_train_dev_loss, ' -> ', train_dev_loss)
-                      self.model.save_weights('best_train_dev_loss.hf')
-                      best_train_dev_loss = train_dev_loss
-                      best_ite = ite
-            
+                    train_dev_p = self.target_distribution(
+                        self.model.predict(train_dev_data[0], verbose=0)[1])
+                    train_dev_loss = np.round(self.model.test_on_batch(
+                        train_dev_data[0],
+                        [train_dev_data[1], train_dev_p, train_dev_data[0]]
+                        ), 5)
+                    if train_dev_loss[1] < best_train_dev_loss[1] and \
+                            train_dev_loss[-1] < best_train_dev_loss[-1]:
+                            # only interested in classification improvements
+                    
+                        print('saving model: {} -> {}'.format(
+                            best_train_dev_loss, train_dev_loss))
+                        print('saving model: ', best_train_dev_loss, ' -> ', train_dev_loss)
+                        self.model.save_weights(os.path.join(
+                            save_dir, 'best_train_dev_loss.hf'))
+                        best_train_dev_loss = train_dev_loss
+                        best_ite = ite
+
                 # check stop criterion
                 
                 if ite > 0 and delta_label < tol:
                     print('delta_label {} < tol {}'.format(delta_label, tol))
                     print('Reached tolerance threshold. Stopping training.')
-                    logfile.close()
                     break
                 
-                # train on batch
-                """
-                if (index + 1) * self.batch_size > x.shape[0]:
-                  loss = self.model.train_on_batch(x=x[index * self.batch_size::],
-                                                   y=[y[index * self.batch_size::], \
-                                                      p[index * self.batch_size::]])
-                  index = 0
-                else:
-                  loss = self.model.train_on_batch(x=x[index * self.batch_size:(index + 1) * self.batch_size],
-                                                   y=[y[index * self.batch_size:(index + 1) * self.batch_size], \
-                                                      p[index * self.batch_size:(index + 1) * self.batch_size]])
-                  index += 1
-                """
-            
-            if loss_weight_decay:
-                """
-                if ite < 50:
-                  alpha = K.variable(1.0)
-                  beta  = K.variable(0.0)
-                  gamma = K.variable(1.0)
-                elif ite >= 50:
-                  #alpha = K.variable(1.0)
-                  alpha = K.variable(0.0)
-                  #beta  = K.variable(0.0)
-                  beta  = K.variable(1.0)
-                  gamma  = K.variable(1.0)
-                  update_interval = 140
-                  self.model.optimizer = SGD(lr=0.01, momentum=0.9)
-                """
-                """
-                elif ite >= 200 and ite < 300:
-                  #alpha = K.variable(1.0*(1 - ((ite - 200)/100.)))
-                  alpha = K.variable(1.0)
-                  beta  = K.variable(1.0)
-                  gamma = K.variable(1.0)
-                print(K.eval(alpha), K.eval(beta))
-                """
-                #alpha = K.variable(1.0*(1 - ((ite - 200)/100.)))
-                """
-                if ite < 40:
-                  alpha = K.variable((1 - ite/maxiter))
-                  beta  = K.variable(1-alpha)
-                  gamma = K.variable(1.0)
-                print(K.eval(alpha), K.eval(beta), K.eval(gamma))
-                if ite == 40:
-                  print('Initializing cluster centers with k-means.')
-                  kmeans = KMeans(n_clusters=self.n_clusters, n_init=20)
-                  y_pred = kmeans.fit_predict(self.encoder.predict(x))
-                  self.model.get_layer(name='clustering').set_weights([kmeans.cluster_centers_])
-                if ite >= 40:
-                  alpha = K.variable(0.0)
-                  beta  = K.variable(1.0)
-                  gamma = K.variable(1.0)
-                  update_interval=140
-                  self.model.optimizer = SGD(lr=0.01, momentum=0.9)
-                """
-                
+                # Classification loss
                 alpha = K.variable((1 - ite/maxiter))
-                beta  = K.variable(1-alpha)
+                # Clustering loss
+                beta  = K.variable(1-alpha)  # should ignore l=this loss
+                # reconstruction loss
                 gamma = K.variable(1.0)
                 print(K.eval(alpha), K.eval(beta), K.eval(gamma))
                 history = self.model.fit(
@@ -340,10 +324,12 @@ class MultitaskDEC(DEC):
                 print('saving model to: {}'.format(fname))
                 self.model.save_weights(fname)
 
+            self.metrics.save(os.path.join(
+                save_dir, 'metrics_{}.pkl'.format(ite)))
+
             ite += 1
 
         # save the trained model
-        #logfile.close()
         fname = os.path.join(save_dir, 'DEC_model_final.h5')
         print('saving model to: {}'.format(fname))
         self.model.save_weights(fname)
@@ -352,63 +338,6 @@ class MultitaskDEC(DEC):
         cluster_to_label_mapping, n_assigned_list, majority_class_fractions = \
             get_cluster_to_label_mapping_safe(
                 y[:,1], y_p, self.n_classes, self.n_clusters)
-        return y_pred, self.metrics.dump(), best_ite
+        return y_pred, self.metrics, best_ite
 
 
-def one_percent_fpr(y, pred, fom):
-    fpr, tpr, thresholds = roc_curve(y, pred)
-    FoM = 1-tpr[np.where(fpr<=fom)[0][-1]] # MDR at 1% FPR
-    threshold = thresholds[np.where(fpr<=fom)[0][-1]]
-    return FoM, threshold, fpr, tpr
-
-
-def calc_f1_score(y_true, predicted_clusters, cluster_to_label_mapping):
-    y_pred = []
-    for i in range(len(y_true)):
-          y_pred.append(cluster_to_label_mapping[predicted_clusters[i]])
-    return f1_score(y_true, np.array(y_pred))
-
-def get_cluster_to_label_mapping_safe(y, y_pred, n_classes, n_clusters, toprint=True):
-    """Enusre at least one cluster assigned to each label.
-    """
-    one_hot_encoded = np_utils.to_categorical(y, n_classes)
-
-    cluster_to_label_mapping = []
-    n_assigned_list = []
-    majority_class_fractions = []
-    majority_class_pred = np.zeros(y.shape)
-    for cluster in range(n_clusters):
-        cluster_indices = np.where(y_pred == cluster)[0]
-        n_assigned_examples = cluster_indices.shape[0]
-        n_assigned_list.append(n_assigned_examples)
-        cluster_labels = one_hot_encoded[cluster_indices]
-        cluster_label_fractions = np.mean(cluster_labels, axis=0)
-        majority_cluster_class = np.argmax(cluster_label_fractions)
-        cluster_to_label_mapping.append(majority_cluster_class)
-        majority_class_pred[cluster_indices] += majority_cluster_class
-        majority_class_fractions.append(cluster_label_fractions[majority_cluster_class])
-        if toprint:
-            print(cluster, n_assigned_examples, majority_cluster_class, cluster_label_fractions[majority_cluster_class])
-    #print(cluster_to_label_mapping)
-    if toprint:
-        print(np.unique(y), np.unique(cluster_to_label_mapping))
-    try:
-        # make sure there is at least 1 cluster representing each class
-        assert np.all(np.unique(y) == np.unique(cluster_to_label_mapping))
-    except AssertionError:
-        # if there is no cluster for a class then we will assign a cluster to that
-        # class
-
-        # find which class it is
-        # ASSUMPTION - this task is binary
-
-        diff = list(set(np.unique(y)) - set(np.unique(cluster_to_label_mapping)))[0]
-          # we choose the cluster that contains the most examples of the class with no cluster
-
-        one_hot = np_utils.to_categorical(y_pred[np.where(y==diff)[0]], \
-                                            len(cluster_to_label_mapping))
-
-        cluster_to_label_mapping[np.argmax(np.sum(one_hot, axis=0))] = int(diff)
-    if toprint:
-        print(cluster_to_label_mapping)
-    return cluster_to_label_mapping, n_assigned_list, majority_class_fractions

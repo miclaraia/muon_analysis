@@ -94,7 +94,8 @@ setup(
         'pandas',
         'progressbar2',
         'click',
-        'dec-keras'
+        'dec-keras',
+        'tqdm',
     ],
 
     # List additional groups of dependencies here (e.g. development
