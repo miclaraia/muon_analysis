@@ -51,3 +51,7 @@ class Subject:
         return 'id %d event %s' % \
                (self.id, self.event)
 
+    def copy(self, n=0):
+        x = CameraRotate().rotate(self.x, n)
+        return self.__class__(self.id, x, self.metadata, self.y)
+

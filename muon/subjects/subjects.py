@@ -23,23 +23,6 @@ class Subjects:
             subjects = [(s.id, s) for s in subjects]
         self.subjects = OrderedDict(subjects)
 
-    @classmethod
-    def from_data(cls, data_file):
-        if not os.path.isfile(data_file):
-            raise IOError('Data file doesn\'t exist!')
-
-        subject_data = Subject_Data(data_file)
-        subjects = {}
-        for subject, evt, charge in subject_data:
-            if subject is not None:
-                charge = charge[:-1]
-                s = Subject(subject, evt, charge)
-                subjects[subject] = s
-            else:
-                raise Exception('Subject id was None ....')
-
-        return cls(subjects)
-
     def sample(self, size):
         size = int(size)
         subjects = list(self.subjects.values())
@@ -47,6 +30,16 @@ class Subjects:
         if size > len(subjects):
             return subjects
         return random.sample(subjects, size)
+
+    def get_subject(self, s):
+        if '_' in s:
+            s, n = s.split('_')
+            n = int(n)
+            return self.subjects[s].copy(n)
+        return self.subjects[s]
+
+    def get_dimensions(self):
+        return len(self.subjects), len(next(self.iter()).x)
 
 
     ##########################################################################
@@ -154,22 +147,18 @@ class Subjects:
     ###   Subject Charge Data   ##############################################
     ##########################################################################
 
-    def get_xy(self, rotation, labels=None):
+    def get_xy(self, rotation, label):
         x = []
         y = []
         cr = CameraRotate()
         for s in self.iter():
-            if labels is not None:
-                label = labels[s.id]
-            else:
-                label = s.y
             if rotation:
                 for n in range(6):
                     x.append(cr.rotate(s.x, n))
-                    y.append(label)
+                    y.append(s.y[label])
             else:
                 x.append(s.x)
-                y.append(label)
+                y.append(s.y[label])
 
         x = np.array(x)
         y = np.array(y)
@@ -180,7 +169,7 @@ class Subjects:
     ##########################################################################
 
     def __getitem__(self, subject):
-        return self.subjects[subject]
+        return self.get_subject(subject)
 
     def __len__(self):
         return len(self.subjects)
@@ -209,7 +198,7 @@ class Subjects:
         return list(self.subjects.keys())
 
     def subset(self, subjects):
-        subset = [self.subjects[s] for s in subjects]
+        subset = [self.get_subject(s) for s in subjects]
         return self.__class__(subset)
 
     def labeled_subjects(self):

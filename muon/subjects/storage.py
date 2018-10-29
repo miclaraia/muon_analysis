@@ -56,7 +56,7 @@ class Storage:
                 skipped.append(subject)
 
         all_labels = json.loads(hdf.attrs['labels'])
-        all_labels[name] = {s: l for s, l in labels}
+        all_labels[name] = [s for s, l in labels]
         hdf.attrs['labels'] = json.dumps(all_labels)
 
         return skipped
@@ -135,8 +135,11 @@ class Storage:
         return self._to_subject(id, subject)
 
     def get_subjects(self, subjects):
-        subjects = [self.get_subject(s) for s in subjects]
+        subjects = [self.get_subject(s) for s in tqdm(subjects)]
         return Subjects(subjects)
+
+    def labeled_subjects(self, name):
+        return json.loads(self._file.attrs['labels'])[name]
 
     def iter(self):
         hdf = self._file
@@ -147,7 +150,7 @@ class Storage:
         return Subjects(list(self.iter()))
 
     def _to_subject(self, id, hdf_subject):
-        charge = hdf_subject['charge'][:]
+        charge = hdf_subject['charge'][:-1]
         metadata = json.loads(hdf_subject.attrs['metadata'])
         label = json.loads(hdf_subject.attrs['label'])
 
