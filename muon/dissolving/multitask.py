@@ -325,7 +325,7 @@ class MultitaskDEC(DEC):
                 self.model.save_weights(fname)
 
             self.metrics.save(os.path.join(
-                save_dir, 'metrics_{}.pkl'.format(ite)))
+                save_dir, 'metrics_intermediate.pkl'))
 
             ite += 1
 

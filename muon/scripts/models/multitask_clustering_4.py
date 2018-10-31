@@ -78,7 +78,7 @@ def main(splits_file, save_dir):
         maxiter=maxiter,
         alpha=K.variable(1.0),
         beta=K.variable(0.0),
-        gamma=K.variable(.5),
+        gamma=K.variable(1.0),
         loss_weight_decay=False,
         save_dir=save_dir,
         update_interval=update_interval)
