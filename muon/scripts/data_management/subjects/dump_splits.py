@@ -20,7 +20,7 @@ def main(splits_file, subject_data, labels, output, rotation):
 
     for k in splits:
         print(k)
-        splits[k] = subjects.subset(splits[k]).get_xy(rotation, 'hugh')
+        splits[k] = subjects.subset(splits[k]).get_xy(rotation, labels)
         print(splits[k][0].shape)
 
     with open(output, 'wb') as f:

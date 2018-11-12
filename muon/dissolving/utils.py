@@ -1,12 +1,113 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 
 from sklearn.decomposition import PCA
-from sklearn.metrics import f1_score, roc_curve
+from sklearn.metrics import f1_score, roc_curve, homogeneity_score
+from sklearn import metrics
 
 from keras.utils import np_utils
 
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
+
+
+class Metrics:
+    _metric_names = ['f1', 'f1c', 'h', 'nmi']
+
+    def __init__(self):
+        self.metrics = []
+        self.redec_mark = None
+
+    def start_redec(self):
+        self.redec_mark = self.last_ite() + 1
+
+    @classmethod
+    def _print(cls, metric):
+
+        s = '-------------------------------------------------\n' \
+            '%4d  F1=%.4f  F1c=%.4f  h=%.4f  nmi=%.4f\n' \
+            '     vF1=%.4f vF1c=%.4f vh=%.4f vnmi=%.4f\n' \
+            '      loss=%s\n' \
+            '     vloss=%s\n' \
+            '-------------------------------------------------\n'
+
+        m = (metric['iteration'],
+             *(metric['train'][f] for f in cls._metric_names),
+             *(metric['valid'][f] for f in cls._metric_names),
+             metric['loss'], metric['vloss'])
+        return s % m
+
+    def get_ite(self, iteration):
+        for item in self.metrics:
+            if item['iteration'] == iteration:
+                return item
+
+    def print_ite(self, iteration):
+        self._print(self.get_ite(iteration))
+
+    def last_ite(self):
+        return self.metrics[-1]['iteration']
+
+    def add(self, iteration, train, valid, loss, vloss):
+        if self.redec_mark is not None:
+            iteration += self.redec_mark
+
+        metrics = {
+            'iteration': iteration,
+            'train': {f: train[i] for i, f in enumerate(self._metric_names)},
+            'valid': {f: valid[i] for i, f in enumerate(self._metric_names)},
+            'loss': loss,
+            'vloss': vloss
+        }
+        self.metrics.append(metrics)
+        return self._print(metrics)
+
+    def dump(self):
+        output = {k: [] for k in [
+            'iteration',
+            'train_f1',
+            'train_f1c',
+            'train_h',
+            'train_nmi',
+            'valid_f1',
+            'valid_f1c',
+            'valid_h',
+            'valid_nmi']}
+
+        for item in self.metrics:
+            output['iteration'].append(item['iteration'])
+            for f in self._metric_names:
+                output['train_{}'.format(f)].append(item['train'][f])
+                output['valid_{}'.format(f)].append(item['valid'][f])
+
+        return output
+
+    def save(self, fname):
+        with open(fname, 'wb') as f:
+            pickle.dump(self, f)
+
+    def plot(self, fig, title=None):
+        data = self.dump()
+        for i, key in enumerate(self._metric_names):
+            ax = fig.add_subplot(221+i)
+
+            key1 = 'train_{}'.format(key)
+            key2 = 'valid_{}'.format(key)
+
+            x = data['iteration']
+            y1 = data[key1]
+            y2 = data[key2]
+
+            ax.plot(x, y1)
+            ax.plot(x, y2)
+
+            ax.legend([key1, key2])
+            ax.set_title(key)
+
+            if self.redec_mark:
+                ax.plot([self.redec_mark, self.redec_mark], [0, 1], '--')
+        fig.suptitle(title)
+        return fig
 
 
 def one_percent_fpr(y, pred, fom):
@@ -66,6 +167,10 @@ def get_cluster_to_label_mapping_safe(y, y_pred, n_classes, n_clusters, toprint=
     if toprint:
         print(cluster_to_label_mapping)
     return cluster_to_label_mapping, n_assigned_list, majority_class_fractions
+
+
+def get_cluster_centres(dec):
+  return np.squeeze(np.array(dec.model.get_layer(name='clustering').get_weights()))
 
 
 def pca_plot(base_network, x, cluster_centres, y=None, labels=[],

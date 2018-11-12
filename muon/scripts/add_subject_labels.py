@@ -18,13 +18,15 @@ agg_data_f = os.path.join(
 @click.argument('subjects_h5')
 def main(name, labels_csv, subjects_h5):
     labels = []
+    print('Starting')
     with open(labels_csv, 'r') as file:
         reader = csv.DictReader(file)
         for row in tqdm(reader):
             labels.append((row['subject'], int(row['label'])))
 
     storage = Storage(subjects_h5)
-    storage._file.attrs['labels'] = json.dumps({})
+    if 'labels' not in storage._file.attrs:
+        storage._file.attrs['labels'] = json.dumps({})
     print(len(storage._file['subjects']))
     skipped = storage.add_labels(name, labels)
 

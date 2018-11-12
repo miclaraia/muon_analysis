@@ -60,6 +60,9 @@ class Storage:
         hdf.attrs['labels'] = json.dumps(all_labels)
 
         return skipped
+
+    def list_label_names(self):
+        return list(json.loads(self._file.attrs['labels']))
     
     def add_subject(self, subject):
         hdf = self._file

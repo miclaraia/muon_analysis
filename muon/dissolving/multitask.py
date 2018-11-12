@@ -19,6 +19,7 @@ from keras import regularizers
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
 from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
         calc_f1_score, one_percent_fpr
+from muon.dissolving.utils import Metrics
 
 lcolours = ['#D6FF79', '#B0FF92', '#A09BE7', '#5F00BA', '#56CBF9',
             '#F3C969', '#ED254E', '#CAA8F5', '#D9F0FF', '#46351D']
@@ -48,69 +49,6 @@ class MyLossWeightCallback(Callback):
         self.gamma = self.gamma
 
 
-class Metrics:
-    _metric_names = ['f1', 'f1c', 'h', 'nmi']
-
-    def __init__(self):
-        self.metrics = []
-
-    @classmethod
-    def _print(cls, metric):
-
-        s = '-------------------------------------------------\n' \
-            '%4d  F1=%.4f  F1c=%.4f  h=%.4f  nmi=%.4f\n' \
-            '     vF1=%.4f vF1c=%.4f vh=%.4f vnmi=%.4f\n' \
-            '      loss=%s\n' \
-            '     vloss=%s\n' \
-            '-------------------------------------------------\n'
-
-        m = (metric['iteration'],
-             *(metric['train'][f] for f in cls._metric_names),
-             *(metric['valid'][f] for f in cls._metric_names),
-             metric['loss'], metric['vloss'])
-        return s % m
-
-    def print_ite(self, iteration):
-        for item in self.metrics:
-            if item['iteration'] == iteration:
-                return self._print(item)
-
-    def add(self, iteration, train, valid, loss, vloss):
-        metrics = {
-            'iteration': iteration,
-            'train': {f: train[i] for i, f in enumerate(self._metric_names)},
-            'valid': {f: valid[i] for i, f in enumerate(self._metric_names)},
-            'loss': loss,
-            'vloss': vloss
-        }
-        self.metrics.append(metrics)
-        return self._print(metrics)
-
-    def dump(self):
-        output = {k: [] for k in [
-            'iteration',
-            'train_f1',
-            'train_f1c',
-            'train_h',
-            'train_nmi',
-            'valid_f1',
-            'valid_f1c',
-            'valid_h',
-            'valid_nmi']}
-
-        for item in self.metrics:
-            output['iteration'].append(item['iteration'])
-            for f in self._metric_names:
-                output['train_{}'.format(f)].append(item['train'][f])
-                output['valid_{}'.format(f)].append(item['valid'][f])
-
-        return output
-
-    def save(self, fname):
-        with open(fname, 'wb') as f:
-            pickle.dump(self, f)
-
-
 class MultitaskDEC(DEC):
 
     def __init__(self, n_classes, *args, **kwargs):
@@ -128,7 +66,8 @@ class MultitaskDEC(DEC):
 
         return (f1, f1c, h, nmi)
 
-    def build_model(self, alpha, beta, gamma, loss, loss_weights):
+    def build_model(self, alpha, beta, gamma, loss, loss_weights,
+                    model_1='model_1'):
         cluster_weights = self.model.get_layer(name='clustering').get_weights()
 
         a = Input(shape=(self.dims[0],))  # input layer
@@ -156,9 +95,9 @@ class MultitaskDEC(DEC):
                 optimizer=optimizer,
                 loss={
                     'dense_1': 'categorical_crossentropy',
-                    'clustering': 'kld', 'model_1': 'mse'},
+                    'clustering': 'kld', model_1: 'mse'},
                 loss_weights={
-                    'dense_1': alpha, 'clustering': beta, 'model_1': gamma})
+                    'dense_1': alpha, 'clustering': beta, model_1: gamma})
         else:
             self.model.compile(
                 optimizer=optimizer,
@@ -280,7 +219,7 @@ class MultitaskDEC(DEC):
                             best_train_dev_loss, train_dev_loss))
                         print('saving model: ', best_train_dev_loss, ' -> ', train_dev_loss)
                         self.model.save_weights(os.path.join(
-                            save_dir, 'best_train_dev_loss.hf'))
+                            save_dir, 'best_train_dev_loss.h5'))
                         best_train_dev_loss = train_dev_loss
                         best_ite = ite
 

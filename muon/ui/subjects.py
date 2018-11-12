@@ -37,3 +37,13 @@ def add_labels(name, labels_csv, subjects_data):
                 yield row['subject'], row['label']
 
     storage.add_labels(name, label_generator())
+
+@subjects.command()
+@click.argument('subjects_data')
+def list_labels(subjects_data):
+    storage = Storage(subjects_data)
+    print(storage.list_label_names())
+
+
+
+
