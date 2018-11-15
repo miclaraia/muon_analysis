@@ -237,6 +237,7 @@ class MultitaskDEC(DEC):
                 # reconstruction loss
                 gamma = K.variable(1.0)
                 print(K.eval(alpha), K.eval(beta), K.eval(gamma))
+                logger.debug('Fitting model')
                 history = self.model.fit(
                     x=x,
                     y=[y,p,x],
@@ -244,15 +245,18 @@ class MultitaskDEC(DEC):
                         validation_data[0], [validation_data[1], valid_p,
                         validation_data[0]]),
                     callbacks=[MyLossWeightCallback(alpha, beta, gamma)],
-                    verbose=0)
+                    verbose=1)
+                logger.debug('Done Fitting')
             else:
                 print(K.eval(alpha), K.eval(beta), K.eval(gamma))
+                logger.debug('Fitting model')
                 history = self.model.fit(
                     x=x, y=[y,p,x],
                     validation_data=(
                         validation_data[0], [validation_data[1], valid_p,
                         validation_data[0]]),
-                    verbose=0)
+                    verbose=1)
+                logger.debug('Done Fitting')
             #history = self.model.fit(x=x, y=[y,p], callbacks=[MyLossWeightCallback(alpha, beta)], verbose=0)
             #print(history.history)
             loss = [history.history[k][0] for k in history.history.keys() if 'val' not in k]
