@@ -32,7 +32,7 @@ def data_path(path):
 @click.option('--beta', default=0.0, type=float)
 @click.option('--gamma', default=0.0, type=float)
 def main(splits_file, save_dir, batch_size, lr, momentum, tol, maxiter,
-         save_interval, alpha, beta, gamma, norotation):
+         save_interval, alpha, beta, gamma):
     with open(splits_file, 'rb') as f:
         splits = pickle.load(f)
 
