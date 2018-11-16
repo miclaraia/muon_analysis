@@ -4,7 +4,7 @@ set -euxo pipefail
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 THIS="$(readlink -f ${BASH_SOURCE[0]})"
 
-MULTITASK_DIR=$MUOND/clustering_models/run_volunteer_1-1
+MULTITASK_DIR=$MUOND/clustering_models/run_volunteer_1
 SAVE_DIR=${MULTITASK_DIR}/run_redec_1
 SPLITS_FILE=${MUOND}/subjects/tt_split_volunteer_majority_all_xy.pkl
 AE_WEIGHTS=${MULTITASK_DIR}/ae_weights.h5

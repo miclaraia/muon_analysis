@@ -4,12 +4,38 @@ set -euxo pipefail
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 THIS="$(readlink -f ${BASH_SOURCE[0]})"
 
-cd ${HERE}
-aws_url="ec2-user@ec2-18-219-247-64.us-east-2.compute.amazonaws.com"
-ssha="ssh -i ${HOME}/.ssh/zoo_aws_larai002.pem ${aws_url}"
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
 
-scp -i ${HOME}/.ssh/zoo_aws_larai002.pem ${HERE}/muon.env $aws_url:/home/ec2-user
-$ssha << EOF
+    case ${key} in
+        -h|--host)
+            HOST="$2"
+            shift 2
+            ;;
+        -i|--identity)
+            IDENTITY="$2"
+            shift 2
+            ;;
+        -t|--type)
+            INSTANCE_TYPE="$2"
+            shift 2
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]:-}"
+
+cd ${HERE}
+SSH="$(${HERE}/ssh.sh -h ${HOST} --type ${INSTANCE_TYPE} -p)"
+SSH_PRE="$(python3 -c "print(' '.join('${SSH}'.split(' ')[:-1]))")"
+HOST="$(python3 -c "print('${SSH}'.split(' ')[-1])")"
+
+rsync -e "$SSH_PRE" ${HERE}/muon.env $HOST:\${HOME}
+$SSH << EOF
 set -xv
 source \${HOME}/muon.env
 if [ -z \$(mount | grep /mnt/muon) ]; then
@@ -29,7 +55,7 @@ clustering_models/
 subjects/
 EOF
 
-rsync -rPv -e "ssh -i ${HOME}/.ssh/zoo_aws_larai002.pem" --files-from=/tmp/upload_aws_muon_files.txt ${MUOND} ${aws_url}:/mnt/muon/data
+rsync -rPv -e "$SSH_PRE" --files-from=/tmp/upload_aws_muon_files.txt ${MUOND} $HOST:/mnt/muon/data
 rm /tmp/upload_aws_muon_files.txt
 
 #$ssha sudo umount /mnt/data
