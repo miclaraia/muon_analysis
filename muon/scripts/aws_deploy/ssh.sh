@@ -27,6 +27,10 @@ while [[ $# -gt 0 ]]; do
         -t|--type)
             INSTANCE_TYPE=$2
             shift 2
+            ;; 
+        -T)
+            TTY=TRUE
+            shift
             ;;
         *)
             POSITIONAL+=("$1")
@@ -34,7 +38,7 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-set -- "${POSITIONAL[@]:-}"
+set -- "${POSITIONAL[@]}"
 COMMAND="${1:-}"
 
 if [[ ${INSTANCE_TYPE} == "ami" ]]; then
@@ -51,6 +55,9 @@ fi
 command="ssh -i ${IDENTITY} ${USER}@${HOST} ${COMMAND}"
 if [ ${PRINT:-} ]; then
     echo ${command}
+elif [[ ${TTY:-} == TRUE ]]; then
+    command="${command} -tt source \${HOME}/muon.env && bash"
+    $command
 else
     $command
 fi
