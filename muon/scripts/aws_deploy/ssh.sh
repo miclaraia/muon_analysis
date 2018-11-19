@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-set -- "${POSITIONAL[@]}"
+set -- "${POSITIONAL[@]:-}"
 COMMAND="${1:-}"
 
 if [[ ${INSTANCE_TYPE} == "ami" ]]; then
