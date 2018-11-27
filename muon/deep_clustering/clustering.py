@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 class Config:
     def __init__(self, save_dir, **kwargs):
+        self.n_classes = kwargs.get('n_classes', 2)
         self.n_clusters = kwargs.get('n_clusters', 10)
         self.batch_size = kwargs.get('batch_size', 256)
         self.nodes = kwargs.get('nodes', [500, 500, 2000, 10])

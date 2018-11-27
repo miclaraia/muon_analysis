@@ -1,15 +1,64 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
+import json
+import os
 
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score, roc_curve, homogeneity_score
 from sklearn import metrics
 
 from keras.utils import np_utils
+from keras.optimizers import SGD
 
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
 
+
+class Config:
+    def __init__(
+            self, save_dir, splits_file,
+            source_weights, save_weights,
+            **kwargs):
+        self.save_dir  = save_dir
+        self.n_classes = kwargs.get('n_classes') or 2
+        self.n_clusters = kwargs.get('n_clusters') or 10
+        self.batch_size = kwargs.get('batch_size') or 256
+        self.nodes = kwargs.get('nodes') or [500, 500, 2000, 10]
+        self.optimizer = kwargs.get('optimizer') or \
+            ('SGD', {'lr': .01, 'momentum': .9})
+        self.tol = kwargs.get('tol') or .001
+        self.maxiter = kwargs.get('maxiter') or 80
+        self.save_interval = kwargs.get('save_interval') or 5
+        self.update_interval = kwargs.get('update_interval') or 1
+
+        self.splits_file = splits_file
+        self.source_weights = source_weights
+        self.save_weights = save_weights
+
+    def get_optimizer(self):
+        optimizer, kwargs = self.optimizer
+        print(optimizer, kwargs)
+
+        optimizer = {
+            'SGD': lambda kwargs: SGD(**kwargs)
+        }[optimizer](kwargs)
+
+        return optimizer
+
+    def dump(self):
+        fname = os.path.join(self.save_dir, 'config.json')
+        json.dump(self.__dict__, open(fname, 'w'))
+
+    @classmethod
+    def load(cls, fname):
+        data = json.load(open(fname, 'r'))
+        return cls(**data)
+
+    def __str__(self):
+        return str(self.__dict__)
+
+    def __repr__(self):
+        return str(self)
 
 class Metrics:
     _metric_names = ['f1', 'f1c', 'h', 'nmi']

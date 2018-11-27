@@ -13,13 +13,16 @@ from keras.models import Model
 from keras.layers import Input, Dense
 from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping
 from keras import backend as K
+from keras.optimizers import SGD
 from keras import regularizers
+from keras.utils import np_utils
 # from keras.models import load_model
 
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
 from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
         calc_f1_score, one_percent_fpr
 from muon.dissolving.utils import Metrics
+import muon.dissolving.utils
 
 lcolours = ['#D6FF79', '#B0FF92', '#A09BE7', '#5F00BA', '#56CBF9',
             '#F3C969', '#ED254E', '#CAA8F5', '#D9F0FF', '#46351D']
@@ -37,6 +40,16 @@ logger = logging.getLogger(__name__)
 # n_clusters = 10 # number of clusters to use
 # n_classes  = 2  # number of classes
 
+class Config(muon.dissolving.utils.Config):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.maxiter = kwargs.get('maxiter') or 80
+        self.update_interval = kwargs.get('update_interval') or 1
+        self.alpha = kwargs.get('alpha') or 1.0
+        self.beta = kwargs.get('beta') or 0.0
+        self.gamma = kwargs.get('gamma') or 0.0
+
+
 class MyLossWeightCallback(Callback):
     def __init__(self, alpha, beta, gamma):
         self.alpha = alpha
@@ -51,11 +64,41 @@ class MyLossWeightCallback(Callback):
 
 class MultitaskDEC(DEC):
 
-    def __init__(self, n_classes, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, config, input_shape):
+        super().__init__(
+            n_clusters=config.n_clusters,
+            dims=[input_shape[1]] + config.nodes,
+            batch_size=config.batch_size)
 
+        print(self.dims)
         self.metrics = None
-        self.n_classes = n_classes
+
+        self.n_classes = config.n_classes
+        self.n_clusters = config.n_clusters
+        self.config = config
+
+    def init(self, x_train):
+        ae_weights, dec_weights = self.config.save_weights
+        print(x_train.shape)
+        self.initialize_model(
+            optimizer=self.config.get_optimizer(),
+            ae_weights=ae_weights,
+            x=x_train)
+
+        self.model.load_weights(dec_weights, by_name=True)
+        print(self.model.summary())
+
+    @classmethod
+    def load(cls, save_dir, x_train):
+        config = Config.load(os.path.join(save_dir, 'config.json'))
+        input_shape = x_train.shape
+
+        self = cls(config, input_shape)
+        self.init(x_train)
+        self.build_model(0, 0, 0, None, None)
+        print(self.model.summary())
+
+        return self
 
     def _calculate_metrics(self, x, y, y_pred, c_map):
         cluster_pred = self.model.predict(x, verbose=0)[1].argmax(1)
@@ -65,6 +108,19 @@ class MultitaskDEC(DEC):
         nmi = metrics.normalized_mutual_info_score(y[:,1], cluster_pred)
 
         return (f1, f1c, h, nmi)
+
+    def predict_clusters(self, x):
+        q = self.model.predict(x)[1]
+        return q.argmax(1)
+
+    def get_cluster_map(self, x, y, toprint=False):
+        if len(y.shape) == 2:
+            y = y[:,1]
+        q = self.model.predict(x, verbose=0)[1]
+        c_map = get_cluster_to_label_mapping_safe(
+            y, q.argmax(1), self.n_classes,
+            self.n_clusters, toprint=toprint)
+        return c_map
 
     def build_model(self, alpha, beta, gamma, loss, loss_weights,
                     model_1='model_1'):
@@ -109,22 +165,46 @@ class MultitaskDEC(DEC):
 
     def clustering(
             self,
-            x,
-            y,
+            train_data,
             train_dev_data,
             validation_data,
-            tol=1e-3,
-            update_interval=140,
-            maxiter=2e4,
-            save_dir='./results/dec',
-            save_interval=5,
-            pretrained_weights=None,
-            alpha=K.variable(1.0),
-            beta=K.variable(0.0),
-            gamma=K.variable(0.0),
-            loss_weight_decay=True,
+            # x,
+            # y,
+            # train_dev_data,
+            # validation_data,
+            # tol=1e-3,
+            # update_interval=140,
+            # maxiter=2e4,
+            # save_dir='./results/dec',
+            # save_interval=5,
+            # pretrained_weights=None,
+            # alpha=K.variable(1.0),
+            # beta=K.variable(0.0),
+            # gamma=K.variable(0.0),
+            # loss_weight_decay=True,
             loss=None,
             loss_weights=None):
+
+        train_data = (train_data[0], np_utils.to_categorical(train_data[1]))
+        train_dev_data = \
+            (train_dev_data[0], np_utils.to_categorical(train_dev_data[1]))
+        validation_data = \
+            (validation_data[0], np_utils.to_categorical(validation_data[1]))
+
+        x, y = train_data
+
+        print(self.config.alpha)
+        alpha = K.variable(self.config.alpha)
+        beta = K.variable(self.config.beta)
+        gamma = K.variable(self.config.gamma)
+
+        tol = self.config.tol
+        update_interval = self.config.update_interval
+        save_interval = self.config.save_interval
+        maxiter = self.config.maxiter
+
+        ae_weights, dec_weights = self.config.save_weights
+        save_dir = self.config.save_dir
 
         if not os.path.isdir(save_dir):
             raise FileNotFoundError(
@@ -136,7 +216,7 @@ class MultitaskDEC(DEC):
         print('Save interval', save_interval)
    
         try:
-            self.load_weights(pretrained_weights)
+            self.load_weights(dec_weights)
         except AttributeError:
             # initialize cluster centers using k-means
             print('Initializing cluster centers with k-means.')
@@ -146,7 +226,7 @@ class MultitaskDEC(DEC):
             self.model.get_layer(name='clustering') \
                 .set_weights([kmeans.cluster_centers_])
    
-        y_p = self.predict_clusters(x)
+        y_p = super().predict_clusters(x)
    
         cluster_to_label_mapping, n_assigned_list, majority_class_fractions = \
             get_cluster_to_label_mapping_safe(
