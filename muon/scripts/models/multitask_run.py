@@ -4,18 +4,9 @@ import os
 import click
 import shutil
 
-import keras.backend as K
-from keras.optimizers import SGD
-from keras.utils import np_utils
-
-from itertools import combinations_with_replacement
-
 from muon.dissolving.multitask import MultitaskDEC, Config
-from muon.subjects.storage import Storage
 import muon.deep_clustering.clustering
 
-lcolours = ['#CAA8F5', '#D6FF79', '#A09BE7', '#5F00BA', '#56CBF9', \
-            '#F3C969', '#ED254E', '#B0FF92', '#D9F0FF', '#46351D']
 
 def data_path(*args):
     return os.path.join(os.getenv('MUOND'), *args)
@@ -94,38 +85,11 @@ def main(
     dec = MultitaskDEC(config, x_train.shape)
     dec.init(x_train)
     print(dec.model.summary())
-    # dec = MultitaskDEC(
-        # n_classes=n_classes,
-        # dims=dims,
-        # n_clusters=n_clusters,
-        # batch_size=batch_size)
-
-    # dec.initialize_model(
-        # optimizer=SGD(lr=lr, momentum=momentum),
-        # ae_weights=ae_weights,
-        # x=x_train)
-
-    # dec.model.load_weights(dec_weights)
 
     y_pred, metrics, best_ite = dec.clustering(
         (x_train, y_train),
         (x_train_dev, y_train_dev),
-        (x_valid, y_valid),
-        #pretrained_weights=dec_weights
-    )
-    # y_pred, metrics, best_ite = dec.clustering(
-        # x_train, np_utils.to_categorical(y_train),
-        # (x_train_dev, np_utils.to_categorical(y_train_dev)),
-        # (x_valid, np_utils.to_categorical(y_valid)),
-        # pretrained_weights=dec_weights,
-        # maxiter=maxiter,
-        # alpha=K.variable(alpha),
-        # beta=K.variable(beta),
-        # gamma=K.variable(gamma),
-        # loss_weight_decay=False,
-        # save_dir=save_dir,
-        # update_interval=update_interval,
-        # save_interval=save_interval)
+        (x_valid, y_valid))
 
     with open(os.path.join(save_dir, 'results_final.pkl'), 'wb') as f:
         pickle.dump({

@@ -1,8 +1,8 @@
 import numpy as np
 import os
 import logging
-from tqdm import tqdm
-import pickle
+# from tqdm import tqdm
+# import pickle
 
 from sklearn.metrics import f1_score
 from sklearn.cluster import KMeans
@@ -11,14 +11,15 @@ from sklearn.metrics import homogeneity_score
 
 from keras.models import Model
 from keras.layers import Input, Dense
-from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping
+# from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping
+from keras.callbacks import Callback
 from keras import backend as K
-from keras.optimizers import SGD
+# from keras.optimizers import SGD
 from keras import regularizers
 from keras.utils import np_utils
 # from keras.models import load_model
 
-from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
+from dec_keras.DEC import DEC, ClusteringLayer
 from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
         calc_f1_score, one_percent_fpr
 from muon.dissolving.utils import Metrics
@@ -168,20 +169,7 @@ class MultitaskDEC(DEC):
             train_data,
             train_dev_data,
             validation_data,
-            # x,
-            # y,
-            # train_dev_data,
-            # validation_data,
-            # tol=1e-3,
-            # update_interval=140,
-            # maxiter=2e4,
-            # save_dir='./results/dec',
-            # save_interval=5,
-            # pretrained_weights=None,
-            # alpha=K.variable(1.0),
-            # beta=K.variable(0.0),
-            # gamma=K.variable(0.0),
-            # loss_weight_decay=True,
+
             loss=None,
             loss_weights=None):
 

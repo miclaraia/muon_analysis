@@ -1,21 +1,15 @@
 import numpy as np
 import os
-import logging
-from tqdm import tqdm
-import pickle
-import csv
 
-from sklearn.metrics import f1_score
-from sklearn.cluster import KMeans
 from sklearn import metrics
 from sklearn.metrics import homogeneity_score
 
-from keras.models import Model
-from keras.layers import Input, Dense
-from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping
-from keras import backend as K
-from keras import regularizers
-from keras.optimizers import SGD
+# from keras.models import Model
+# from keras.layers import Input, Dense
+# from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping
+# from keras import backend as K
+# from keras import regularizers
+# from keras.optimizers import SGD
 # from keras.models import load_model
 
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
@@ -68,25 +62,10 @@ class ReDEC(DEC):
 
         return self
 
-        # redec = cls(
-            # metrics=None,
-            # dims=[x_train.shape[1]]+config.nodes,
-            # n_clusters=config.n_clusters,
-            # n_classes=config.n_classes)
-
-        # redec.initialize_model(
-            # optimizer=SGD(lr=.01, momentum=.9),
-            # ae_weights=ae_weights,
-            # x=x_train)
-        
-        # redec.model.load_weights(dec_weights)
-        
-        # return redec
-
     def load_multitask_weights(self, mdec):
         for i in range(1, len(mdec.model.layers[1].layers)):
             self.model.layers[i].set_weights(
-                    mdec.model.layers[1].layers[i].get_weights())
+                mdec.model.layers[1].layers[i].get_weights())
         self.model.layers[-1].set_weights(mdec.model.layers[2].get_weights())
 
     def _calculate_metrics(self, x, y, c_map):
@@ -110,15 +89,7 @@ class ReDEC(DEC):
                    train_data,
                    train_dev_data,
                    test_data,
-                   valid_data,
-                   # tol=1e-3,
-                   # update_interval=140,
-                   # epochs=80,
-                   # pretrained_weights=None,
-                   # last_ite=0,
-                   # save_dir='./results/dec',
-                   # save_interval=5):
-                   ):
+                   valid_data):
 
         tol = self.config.tol
         update_interval = self.config.update_interval
@@ -142,7 +113,7 @@ class ReDEC(DEC):
 
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        
+
         if self.metrics is None:
             self.metrics = Metrics()
 
@@ -152,7 +123,7 @@ class ReDEC(DEC):
             if ite % update_interval == 0:
                 q = self.model.predict(x, verbose=0)
                 # update the auxiliary target distribution p
-                p = self.target_distribution(q)  
+                p = self.target_distribution(q)
 
                 # evaluate the clustering performance
                 y_pred = q.argmax(1)
