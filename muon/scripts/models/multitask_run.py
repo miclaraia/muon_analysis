@@ -3,6 +3,7 @@ import numpy as np
 import os
 import click
 import shutil
+from datetime import datetime
 
 from muon.dissolving.multitask import MultitaskDEC, Config
 import muon.deep_clustering.clustering
@@ -14,7 +15,7 @@ def data_path(*args):
 @click.group(invoke_without_command=True)
 @click.option('--splits_file', required=True)
 @click.option('--source_dir', required=True)
-@click.option('--save_dir', required=True)
+@click.option('--model_name', required=True)
 @click.option('--batch_size', type=int)
 @click.option('--lr', type=float, default=0.01)
 @click.option('--momentum', type=float, default=0.9)
@@ -27,7 +28,7 @@ def data_path(*args):
 def main(
         splits_file,
         source_dir,
-        save_dir,
+        model_name,
         batch_size,
         lr,
         momentum,
@@ -35,6 +36,15 @@ def main(
         maxiter,
         save_interval,
         alpha, beta, gamma):
+
+    model_name = '{}-{}'.format(
+        model_name, datetime.now().replace(microsecond=0).isoformat())
+    save_dir = os.path.join(
+        os.getenv('MUOND'), 'clustering_models', model_name)
+    if os.path.isdir(save_dir):
+        raise FileExistsError(save_dir)
+    os.makedirs(save_dir)
+
     with open(splits_file, 'rb') as f:
         splits = pickle.load(f)
 
@@ -49,11 +59,12 @@ def main(
     y_train = y_train[order]
     print(x_train.shape, x_test.shape, x_valid.shape, x_train_dev.shape)
 
-    source_config = muon.deep_clustering.clustering.Config.load(data_path(
+    source_config = muon.deep_clustering.clustering.Config.load(os.path.join(
         source_dir, 'config.json'))
 
     config_args = {
         'save_dir': save_dir,
+        'source_dir': source_dir,
         'splits_file': splits_file,
         'n_classes': 2,
         'n_clusters': source_config.n_clusters,

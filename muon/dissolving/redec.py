@@ -27,7 +27,7 @@ class Config(muon.dissolving.utils.Config):
 
 
 class ReDEC(DEC):
-    def __init__(self, metrics, config, input_shape):
+    def __init__(self, config, input_shape):
         super().__init__(
             n_clusters=config.n_clusters,
             dims=[input_shape[1]] + config.nodes,
@@ -35,12 +35,12 @@ class ReDEC(DEC):
 
         print(self.dims)
 
-        self.metrics = metrics
+        self.metrics = None
         self.n_classes = config.n_classes
         self.n_clusters = config.n_clusters
         self.config = config
 
-    def init(self, x_train):
+    def init(self, x_train, verbose=True):
         ae_weights, dec_weights = self.config.save_weights
         print(x_train.shape)
         self.initialize_model(
@@ -49,16 +49,16 @@ class ReDEC(DEC):
             x=x_train)
 
         self.model.load_weights(dec_weights, by_name=True)
-        print(self.model.summary())
+        if verbose:
+            print(self.model.summary())
 
     @classmethod
-    def load(cls, save_dir, x_train):
+    def load(cls, save_dir, x_train, verbose=True):
         config = Config.load(os.path.join(save_dir, 'config.json'))
         input_shape = x_train.shape
 
-        self = cls(None, config, input_shape)
-        self.init(x_train)
-        print(self.model.summary())
+        self = cls(config, input_shape)
+        self.init(x_train, verbose)
 
         return self
 
@@ -106,10 +106,14 @@ class ReDEC(DEC):
         y_pred_last = None
         # iterations per epoch
         batches = np.ceil(x.shape[0] / self.batch_size)
+        maxiter = epochs * batches
 
         print('Update interval', update_interval)
         save_interval = batches * 5
         print('Save interval', save_interval)
+        print('MaxIter', maxiter)
+        print('Batches', batches)
+        print('Validation data', x_valid.shape, y_valid.shape)
 
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -119,7 +123,7 @@ class ReDEC(DEC):
 
         loss = 0
         index = 0
-        for ite in range(int(epochs * batches)):
+        for ite in range(int(maxiter)):
             if ite % update_interval == 0:
                 q = self.model.predict(x, verbose=0)
                 # update the auxiliary target distribution p

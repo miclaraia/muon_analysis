@@ -78,7 +78,7 @@ class MultitaskDEC(DEC):
         self.n_clusters = config.n_clusters
         self.config = config
 
-    def init(self, x_train):
+    def init(self, x_train, verbose=True):
         ae_weights, dec_weights = self.config.save_weights
         print(x_train.shape)
         self.initialize_model(
@@ -87,17 +87,19 @@ class MultitaskDEC(DEC):
             x=x_train)
 
         self.model.load_weights(dec_weights, by_name=True)
-        print(self.model.summary())
+        if verbose:
+            print(self.model.summary())
 
     @classmethod
-    def load(cls, save_dir, x_train):
+    def load(cls, save_dir, x_train, verbose=True):
         config = Config.load(os.path.join(save_dir, 'config.json'))
+        dec_weights = config.save_weights[1]
         input_shape = x_train.shape
 
         self = cls(config, input_shape)
-        self.init(x_train)
+        self.init(x_train, verbose)
         self.build_model(0, 0, 0, None, None)
-        print(self.model.summary())
+        self.model.load_weights(dec_weights, by_name=True)
 
         return self
 
@@ -290,6 +292,7 @@ class MultitaskDEC(DEC):
                             save_dir, 'best_train_dev_loss.h5'))
                         best_train_dev_loss = train_dev_loss
                         best_ite = ite
+                        self.metrics.mark_best(ite)
 
                 # check stop criterion
                 

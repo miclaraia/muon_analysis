@@ -3,10 +3,12 @@ import numpy as np
 import os
 import click
 import shutil
+from datetime import datetime
 
 
 from muon.dissolving.redec import ReDEC, Config
 from muon.dissolving.multitask import MultitaskDEC
+from muon.dissolving.multitask import Config as MultitaskConfig
 import muon.deep_clustering.clustering
 
 
@@ -20,9 +22,8 @@ def load_metrics(save_dir):
 
 
 @click.group(invoke_without_command=True)
-@click.option('--splits_file', required=True)
 @click.option('--source_dir', required=True)
-@click.option('--save_dir', required=True)
+@click.option('--model_name', required=True)
 @click.option('--batch_size', default=256, type=int)
 @click.option('--lr', default=0.01, type=float)
 @click.option('--momentum', default=0.9, type=float)
@@ -30,9 +31,9 @@ def load_metrics(save_dir):
 @click.option('--epochs', default=80, type=int)
 @click.option('--save_interval', default=5, type=int)
 @click.option('--update_interval', default=140, type=int)
-def main(splits_file,
+def main(
          source_dir,
-         save_dir,
+         model_name,
          batch_size,
          lr,
          momentum,
@@ -40,6 +41,19 @@ def main(splits_file,
          epochs,
          save_interval,
          update_interval):
+
+    model_name = '{}-{}'.format(
+        model_name, datetime.now().isoformat(timespec='seconds'))
+    save_dir = os.path.join(
+        os.getenv('MUOND'), 'clustering_models', model_name)
+    if os.path.isdir(save_dir):
+        raise FileExistsError(save_dir)
+    os.makedirs(save_dir)
+
+    source_config = MultitaskConfig.load(os.path.join(
+        source_dir, 'config.json'))
+
+    splits_file = source_config.splits_file
 
     with open(splits_file, 'rb') as f:
         splits = pickle.load(f)
@@ -55,11 +69,10 @@ def main(splits_file,
     y_train = y_train[order]
     print(x_train.shape, x_test.shape, x_valid.shape, x_train_dev.shape)
 
-    source_config = muon.deep_clustering.clustering.Config.load(data_path(
-        source_dir, 'config.json'))
 
     config_args = {
         'save_dir': save_dir,
+        'source_dir': source_dir,
         'splits_file': splits_file,
         'n_classes': 2,
         'n_clusters': source_config.n_clusters,
@@ -73,7 +86,7 @@ def main(splits_file,
     }
 
     ae_weights = os.path.join(source_dir, 'ae_weights.h5')
-    dec_weights = os.path.join(source_dir, 'DEC_model_final.h5')
+    dec_weights = os.path.join(source_dir, 'best_train_dev_loss.h5')
     config_args['source_weights'] = ae_weights, dec_weights
 
     ae_weights = os.path.join(save_dir, 'ae_weights.h5')
@@ -86,11 +99,8 @@ def main(splits_file,
         shutil.copyfile(config.source_weights[i], config.save_weights[i])
 
     mdec = MultitaskDEC.load(source_dir, x_train)
-    metrics = load_metrics(source_dir)
-    metrics.start_redec()
-    print(metrics.print_ite(metrics.last_ite()))
 
-    redec = ReDEC(metrics, config, x_train.shape)
+    redec = ReDEC(config, x_train.shape)
     redec.init(x_train)
     redec.load_multitask_weights(mdec)
 
@@ -104,7 +114,6 @@ def main(splits_file,
         pickle.dump({
             'y_pred': y_pred,
             'metrics': metrics}, f)
-
 
 if __name__ == '__main__':
     main()
