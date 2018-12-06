@@ -35,6 +35,10 @@ class Storage:
 
         return self._manifest
 
+    def close(self):
+        if self._f:
+            self._f.close()
+
     def add_subjects(self, subjects):
         skipped = []
         for subject in tqdm(subjects):

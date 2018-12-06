@@ -147,21 +147,14 @@ class Subjects:
     ###   Subject Charge Data   ##############################################
     ##########################################################################
 
-    def get_xy(self, rotation, label):
-        x = []
-        y = []
-        cr = CameraRotate()
-        for s in self.iter():
-            if rotation:
-                for n in range(6):
-                    x.append(cr.rotate(s.x, n))
-                    y.append(s.y[label])
-            else:
-                x.append(s.x)
-                y.append(s.y[label])
+    def get_xy(self, subjects, label):
+        x = np.zeros((len(subjects), self.get_dimensions()[1]))
+        y = np.zeros((len(subjects,)))
+        for i, s in enumerate(subjects):
+            s = self.get_subject(s)
+            x[i,:] = s.x
+            y[i] = s.y[label]
 
-        x = np.array(x)
-        y = np.array(y)
         return x, y
 
     ##########################################################################

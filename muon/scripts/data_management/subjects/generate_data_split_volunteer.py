@@ -4,6 +4,7 @@ import numpy as np
 import click
 import json
 import pandas
+import pickle
 
 from muon.subjects.storage import Storage
 
@@ -36,15 +37,16 @@ def make_splits(keys, splits):
 
 @click.group(invoke_without_command=True)
 @click.option('--subject_data', required=True)
-@click.option('--train_labels', required=True)
-@click.option('--true_labels', required=True)
-@click.option('--output_file', required=True)
+@click.option('--train_label_name', required=True)
+@click.option('--true_label_name', required=True)
+@click.option('--splits_out', required=True)
+@click.option('--xy_out', required=True)
 @click.option('--train_rotation', is_flag=True)
 @click.option('--true_rotation', is_flag=True)
-def main(subject_data, train_labels, true_labels, output_file,
+def main(subject_data, train_label_name, true_label_name, splits_out, xy_out,
          train_rotation, true_rotation):
     storage = Storage(subject_data)
-    label_keys = {'train': train_labels, 'true': true_labels}
+    label_keys = {'train': train_label_name, 'true': true_label_name}
 
     train_labels = set(get_labels(storage, label_keys['train'], train_rotation))
     true_labels = set(get_labels(storage, label_keys['true'], true_rotation))
@@ -76,8 +78,31 @@ def main(subject_data, train_labels, true_labels, output_file,
     df.insert(0, '', ['n', 'fraction'])
     print(df)
 
-    with open(output_file, 'w') as file:
+    with open(splits_out, 'w') as file:
         json.dump(splits, file)
+
+    # Generate xy data
+    l = {k: len(splits[k]) for k in splits}
+    print(l)
+
+    labels = list(set([s.split('_')[0] for s in all_labels]))
+    subjects = storage.get_subjects(labels)
+    storage.close()
+    for k in train_splits:
+        print(k)
+        splits[k] = subjects.get_xy(splits[k], train_label_name)
+        print(splits[k][0].shape)
+    for k in test_splits:
+        print(k)
+        splits[k] = subjects.get_xy(splits[k], true_label_name)
+        print(splits[k][0].shape)
+
+    l2 = {k: splits[k][0].shape[0] for k in splits}
+    print(l2)
+    assert l == l2
+
+    with open(xy_out, 'wb') as f:
+        pickle.dump(splits, f)
 
 
 main()
