@@ -8,6 +8,7 @@ IDENTITY=${HOME}/.ssh/zoo_aws_larai002.pem
 INSTANCE_TYPE=ami
 
 POSITIONAL=()
+(>&2 echo $@)
 while [[ $# -gt 0 ]]; do
     key="$1"
 
@@ -52,12 +53,14 @@ if [[ ${COMMAND} == "exit" ]]; then
     exit
 fi
 
-command="ssh -i ${IDENTITY} ${USER}@${HOST} ${COMMAND}"
+command="ssh -i ${IDENTITY} ${USER}@${HOST}"
+if [[ ${TTY:-} == TRUE ]]; then
+    command+=" -tt source \${HOME}/muon.env && bash"
+    #command="${command} -tt source \${HOME}/muon.env && bash"
+fi
+command+=${COMMAND}
 if [ ${PRINT:-} ]; then
     echo ${command}
-elif [[ ${TTY:-} == TRUE ]]; then
-    command="${command} -tt source \${HOME}/muon.env && bash"
-    $command
 else
     $command
 fi

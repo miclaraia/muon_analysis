@@ -23,6 +23,15 @@ while [[ $# -gt 0 ]]; do
             ;;
         -c|--clean)
             CLEAN=TRUE
+            shift
+            ;;
+        --python)
+            SETUP_PYTHON=TRUE
+            shift
+            ;;
+        --device)
+            DEVICE="$2"
+            shift 2
             ;;
         *)
             POSITIONAL+=("$1")
@@ -47,6 +56,9 @@ rsync -rv -e "$SSH_PRE" \
 rsync -e "$SSH_PRE" ${MUON}/setup.py ${HOST}:\${HOME}/muon
 rsync -e "$SSH_PRE" ${MUON}/VERSION ${HOST}:\${HOME}/muon
 
+# Setting up the drive
+# sudo mkfs -t ext4 /dev/xvdf
+
 
 if [[ "${CLEAN:-}" == TRUE ]]; then
 $SSH << EOF
@@ -62,46 +74,58 @@ if [ ! -f \$(which python3) ] || [ -z \$(python3 -m virtualenv) ]; then
     fi
 fi
 
-if [ -z \$(mount | grep /mnt/muon) ]; then
+if [ -z "\$(mount | grep /mnt/muon)" ]; then
+    if [ -z "\$(sudo blkid | grep ${DEVICE})" ]; then
+        echo "Couldn't find device ${DEVICE}"
+        echo \$(sudo blkid)
+        exit 1
+    fi
     sudo mkdir -p /mnt/muon
-    sudo mount -U 96d0c028-399a-4559-967f-ebaa5177d87e /mnt/muon
+    sudo mount -U ${DEVICE} /mnt/muon
+    if [ ! -d /mnt/muon/data ]; then
+        mkdir /mnt/muon/data
+    fi
     sudo chmod 777 /mnt/muon
 fi
 find \${MUOND} -not -user \${USER} -exec sudo chown \${USER}:\${USER} \;
 
+if [[ "${SETUP_PYTHON:-}" == "TRUE" ]]; then
+    if [[ \$(which python3) == "/home/ubuntu/anaconda3/bin//python3" ]]; then
+        if [ ! -z "\$(conda env list | grep muon)" ]; then
+            conda env remove --name muon -y
+        fi
 
-if [[ \$(which python3) == "/home/ubuntu/anaconda3/bin//python3" ]]; then
-    if [ ! -z "\$(conda env list | grep muon)" ]; then
-        conda env remove --name muon -y
-    fi
-
-    conda create --name muon --clone tensorflow_p36
-cat > \${HOME}/muon-activate << EOF2
+        set +u
+        source activate tensorflow_p36
+        conda create --name muon --clone tensorflow_p36
+        set -u
+    cat > \${HOME}/muon-activate << EOF2
 source activate muon
 EOF2
 
-else
-    if [ -d \${MUON}/venv ]; then
-        rm -R \${MUON}/venv
-    fi
-    python3 -m virtualenv --python=python3 \${MUON}/venv
-cat > \${HOME}/muon-activate << EOF2
+    else
+        if [ -d \${MUON}/venv ]; then
+            rm -R \${MUON}/venv
+        fi
+        python3 -m virtualenv --python=python3 \${MUON}/venv
+    cat > \${HOME}/muon-activate << EOF2
 source \${MUON}/venv/bin/activate
 EOF2
 
+    fi
+
+    set +u
+    . \${HOME}/muon-activate
+    set -u
+
+    pip install --upgrade pip
+    pip install git+https://github.com/miclaraia/DEC-keras.git
+    #pip uninstall -y tensorflow tensorflow-cpu
+    #pip install tensorflow-gpu
+    pip install -e \${MUON}
+
+    python -c "import tensorflow as tf; sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))"
 fi
-
-set +u
-. \${HOME}/muon-activate
-set -u
-
-pip install --upgrade pip
-pip install git+https://github.com/miclaraia/DEC-keras.git
-#pip uninstall -y tensorflow tensorflow-cpu
-#pip install tensorflow-gpu
-pip install -e \${MUON}
-
-python -c "import tensorflow as tf; sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))"
 EOF
 
 fi

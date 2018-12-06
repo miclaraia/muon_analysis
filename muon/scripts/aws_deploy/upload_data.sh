@@ -21,6 +21,10 @@ while [[ $# -gt 0 ]]; do
             INSTANCE_TYPE="$2"
             shift 2
             ;;
+        --device)
+            DEVICE="$2"
+            shift 2
+            ;;
         *)
             POSITIONAL+=("$1")
             shift
@@ -40,7 +44,7 @@ set -xv
 source \${HOME}/muon.env
 if [ -z \$(mount | grep /mnt/muon) ]; then
     sudo mkdir -p /mnt/muon
-    sudo mount -U 96d0c028-399a-4559-967f-ebaa5177d87e /mnt/muon
+    sudo mount -U ${DEVICE} /mnt/muon
     sudo chmod 777 /mnt/muon
 fi
 if [ ! -d /mnt/muon/data ]; then
@@ -55,7 +59,13 @@ clustering_models/
 subjects/
 EOF
 
-rsync -rPv -e "$SSH_PRE" --files-from=/tmp/upload_aws_muon_files.txt ${MUOND} $HOST:/mnt/muon/data
+rsync -rcPv -e "$SSH_PRE" \
+    --files-from=/tmp/upload_aws_muon_files.txt \
+    --exclude 'clustering_models/aws' \
+    --exclude 'clustering_models/run*' \
+    --exclude 'clustering_models/hugh' \
+    --exclude 'clustering_models/volunteer' \
+    ${MUOND} $HOST:/mnt/muon/data
 rm /tmp/upload_aws_muon_files.txt
 
 #$ssha sudo umount /mnt/data
