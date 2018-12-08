@@ -1,0 +1,50 @@
+#!/bin/bash
+set -euxo pipefail
+
+HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+THIS="$(readlink -f ${BASH_SOURCE[0]})"
+
+cd ${HERE}
+
+upload () {
+    rsync -rv \
+        --exclude="__pycache__" \
+        --exclude="*.pkl" \
+        --exclude="*.csv" \
+        --exclude="*.json" \
+        muon zoo:/home/larai002/Zooniverse/repos/muon/
+    rsync setup.py zoo:/home/larai002/Zooniverse/repos/muon
+    
+    cd $ZOO/zootools
+    git archive --format=tar.gz --prefix=zootools master > /tmp/zootools.tar.gz
+    scp /tmp/zootools.tar.gz zoo:/home/larai002/Zooniverse/repos/zootools.tar.gz
+    ssh zoo << EOF
+        source \${HOME}/.profile
+        cd \${ZOO}
+        tar -zxvf zootools.tar.gz
+        rm zootools.tar.gz
+EOF
+
+}
+
+desktop () {
+    rsync -rv --exclude="__pycache__" --exclude="*.pkl" --exclude="*.csv" --exclude="*.json" muon 10.8.0.1:/home/michael/Documents/Zooniverse/repos/muon/
+}
+
+notebook () {
+    rsync -rv --exclude="mnt" --include="*.ipynb" zoo:/home/larai002/Zooniverse/repos/muon/notebook/ notebook
+}
+
+command=$1
+shift
+case $command in
+    "upload")
+        upload
+        ;;
+    "desktop")
+        desktop
+        ;;
+    "notebook")
+        notebook
+        ;;
+esac
