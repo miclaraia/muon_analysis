@@ -11,10 +11,10 @@ from muon.subjects.storage import Storage
 
 def get_labels(storage, label_name, rotation):
     subject_ids = storage.labeled_subjects(label_name)
-    if not rotation:
-        return subject_ids
-    else:
+    if rotation:
         return ['{}_{}'.format(s, n) for s in subject_ids for n in range(6)]
+    else:
+        return subject_ids
 
 
 def make_splits(keys, splits):
@@ -35,16 +35,28 @@ def make_splits(keys, splits):
     return splits
 
 
+def check_split_fraction(splits):
+    s = sum(splits.values())
+    if s != 1:
+        print(splits)
+        raise ValueError('Sum of fractions is not 1:', s)
+    return True
+
+
 @click.group(invoke_without_command=True)
 @click.option('--subject_data', required=True)
 @click.option('--train_label_name', required=True)
 @click.option('--true_label_name', required=True)
 @click.option('--splits_out', required=True)
 @click.option('--xy_out', required=True)
+@click.option('--train', type=float, required=True)
+@click.option('--train_dev', type=float, required=True)
+@click.option('--valid', type=float, required=True)
+@click.option('--test', type=float, required=True)
 @click.option('--train_rotation', is_flag=True)
 @click.option('--true_rotation', is_flag=True)
 def main(subject_data, train_label_name, true_label_name, splits_out, xy_out,
-         train_rotation, true_rotation):
+         train, train_dev, valid, test, train_rotation, true_rotation):
     storage = Storage(subject_data)
     label_keys = {'train': train_label_name, 'true': true_label_name}
 
@@ -55,13 +67,16 @@ def main(subject_data, train_label_name, true_label_name, splits_out, xy_out,
     train_labels = train_labels - true_labels
 
     train_splits = {
-        'train': .75,
-        'train_dev': .25
+        'train': train,
+        'train_dev': train_dev
     }
     test_splits = {
-        'valid': .75,
-        'test': .25
+        'valid': valid,
+        'test': test
     }
+
+    check_split_fraction(train_splits)
+    check_split_fraction(test_splits)
 
     splits = {}
     splits.update(make_splits(train_labels, train_splits))

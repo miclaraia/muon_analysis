@@ -25,5 +25,6 @@ python generate_data_split_volunteer.py \
     --true_label_name hugh \
     --splits_out $MUOND/subjects/split_${NAME}.json \
     --xy_out ${MUOND}/subjects/split_${NAME}_xy.pkl \
+    --train 0.75 --train_dev 0.25 --valid 0.75 --test 0.25 \
     --train_rotation \
     --true_rotation
