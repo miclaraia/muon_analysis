@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euxo pipefail
 
 # python $MUON/muon/scripts/data_management/subjects/generate_data_split.py \
 #     $MUOND/subjects/subject_data_v3.hdf5 \
@@ -25,7 +26,7 @@ python generate_splits.py \
     --true_label_name hugh \
     --splits_out $MUOND/subjects/split_${NAME}.json \
     --xy_out ${MUOND}/subjects/split_${NAME}_xy.pkl \
-    --train 0.9 --train_dev 0.1 --valid 0.75 --test 0.25 \
+    --train 0.9 --train_dev 0.1 --valid 0.5 --test 0.5 \
     --train_rotation \
     --true_rotation
 
@@ -36,4 +37,4 @@ python generate_splits.py \
     --true_label_name hugh \
     --splits_out $MUOND/subjects/split_${NAME}.json \
     --xy_out ${MUOND}/subjects/split_${NAME}_xy.pkl \
-    --train 0.9 --train_dev 0.1 --valid 0.75 --test 0.25
+    --train 0.9 --train_dev 0.1 --valid 0.5 --test 0.5 \

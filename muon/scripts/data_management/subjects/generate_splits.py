@@ -42,6 +42,21 @@ def check_split_fraction(splits):
         raise ValueError('Sum of fractions is not 1:', s)
     return True
 
+def check_splits(splits):
+    for k in splits:
+        split = splits[k]
+        assert len(split) == len(set(split))
+
+    splits = {k: set(splits[k]) for k in splits}
+    for k in splits:
+        for j in splits:
+            if k == j:
+                continue
+            if splits[j] & splits[k]:
+                # There is overlap between splits
+                print(splits[j] & splits[k])
+                raise ValueError('Found overlap between {} and {}'.format(k, j))
+
 
 @click.group(invoke_without_command=True)
 @click.option('--subject_data', required=True)
@@ -92,6 +107,8 @@ def main(subject_data, train_label_name, true_label_name, splits_out, xy_out,
     df = pandas.DataFrame(stats, columns=keys)
     df.insert(0, '', ['n', 'fraction'])
     print(df)
+
+    check_splits(splits)
 
     with open(splits_out, 'w') as file:
         json.dump(splits, file)
