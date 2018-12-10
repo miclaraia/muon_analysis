@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.colors
 import numpy as np
 import pickle
 import json
@@ -13,6 +14,7 @@ from keras.utils import np_utils
 from keras.optimizers import SGD
 
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
+from muon.deep_clustering.clustering import discrete_cmap
 
 
 class Config:
@@ -21,6 +23,7 @@ class Config:
             source_weights, save_weights,
             **kwargs):
         self.save_dir  = save_dir
+        self.name = kwargs.get('name')
         self.n_classes = kwargs.get('n_classes') or 2
         self.n_clusters = kwargs.get('n_clusters') or 10
         self.batch_size = kwargs.get('batch_size') or 256
@@ -315,7 +318,71 @@ def get_cluster_to_label_mapping_safe(y, y_pred, n_classes, n_clusters, toprint=
 
 
 def get_cluster_centres(dec):
-  return np.squeeze(np.array(dec.model.get_layer(name='clustering').get_weights()))
+    return np.squeeze(np.array(
+        dec.model.get_layer(name='clustering').get_weights()))
+
+def pca_plotv2(dec, x, y, n_clusters, title):
+    y_pred = dec.predict_clusters(x)
+
+    cluster_centers = dec.model.get_layer(name='clustering')
+    cluster_centers = cluster_centers.get_weights()
+    cluster_centers = np.squeeze(np.array(cluster_centers))
+
+    labels = [str(i) for i in range(n_clusters)]
+    
+    unique = np.unique(y_pred)
+    cluster_ids = unique
+    cluster_centers = cluster_centers[unique,:]
+    labels = np.array(labels)[unique]
+    
+    return _pca_plotv2(
+        dec, x, y, y_pred, cluster_centers, cluster_ids, labels=labels, title=title)
+
+
+def _pca_plotv2(dec, x, y, y_pred, cluster_centres, cluster_ids, labels,
+                ulcolour='#747777', ccolour='#4D6CFA', title=None):
+    base_network = dec.encoder
+
+    pca = PCA(n_components=3)
+    x_pca = pca.fit_transform(base_network.predict(x))
+    print(pca.explained_variance_ratio_)
+    c_pca = pca.transform(cluster_centres)
+
+    fig = plt.figure(figsize=(16, 8))
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
+    
+    ax = [ax1, ax2]
+    y = [y.astype(np.int), y_pred]
+    subtitle = ['Color by Class', 'Color by Cluster']
+    
+    for ax, y, subtitle in zip(ax, y, subtitle):
+        unique_targets = list(np.unique(y))
+
+        N = len(unique_targets)
+        cmap = discrete_cmap(N, 'jet')
+        norm = matplotlib.colors.BoundaryNorm(
+            np.arange(0, max(3, N), 1), max(3, N))
+
+        if -1 in unique_targets:
+            unique_targets.remove(-1)
+        for i, l in enumerate(unique_targets):
+            _x = x_pca[np.where(y == l), 0]
+            _y = x_pca[np.where(y == l), 1]
+            _c = i * np.ones(_x.shape)
+            ax.scatter(_x, _y, marker='o', s=5, c=_c,
+                       cmap=cmap, norm=norm, alpha=0.2, label=labels[np.where(cluster_ids==l)])
+            
+        ax.scatter(
+            c_pca[:,0], c_pca[:,1],
+            marker='o', s=40, color=ccolour, alpha=1.0, label='cluster centre')
+        for i in range(len(cluster_centres)):
+            ax.text(c_pca[i,0], c_pca[i,1], str(i), size=20)
+        ax.set_title(subtitle)    
+        ax.set_axis_off()
+
+    fig.suptitle(title)
+    return fig, pca
 
 
 def pca_plot(base_network, x, cluster_centres, y=None, labels=[],

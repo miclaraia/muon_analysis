@@ -1,8 +1,10 @@
 import numpy as np
 import os
 import logging
+import shutil
 # from tqdm import tqdm
-# import pickle
+import pickle
+import matplotlib.pyplot as plt
 
 from sklearn.metrics import f1_score
 from sklearn.cluster import KMeans
@@ -12,6 +14,7 @@ from sklearn.metrics import homogeneity_score
 from keras.models import Model
 from keras.layers import Input, Dense
 # from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping
+from keras.callbacks import EarlyStopping
 from keras.callbacks import Callback
 from keras import backend as K
 # from keras.optimizers import SGD
@@ -23,7 +26,9 @@ from dec_keras.DEC import DEC, ClusteringLayer
 from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
         calc_f1_score, one_percent_fpr
 from muon.dissolving.utils import Metrics
+from muon.dissolving.utils import pca_plotv2
 import muon.dissolving.utils
+import muon.dissolving.decv2 as decv2
 
 lcolours = ['#D6FF79', '#B0FF92', '#A09BE7', '#5F00BA', '#56CBF9',
             '#F3C969', '#ED254E', '#CAA8F5', '#D9F0FF', '#46351D']
@@ -41,7 +46,7 @@ logger = logging.getLogger(__name__)
 # n_clusters = 10 # number of clusters to use
 # n_classes  = 2  # number of classes
 
-class Config(muon.dissolving.utils.Config):
+class Config(decv2.Config):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.maxiter = kwargs.get('maxiter') or 80
@@ -49,6 +54,7 @@ class Config(muon.dissolving.utils.Config):
         self.alpha = kwargs.get('alpha') or 1.0
         self.beta = kwargs.get('beta') or 0.0
         self.gamma = kwargs.get('gamma') or 0.0
+        self.patience = kwargs.get('patience') or 10
 
 
 class MyLossWeightCallback(Callback):
@@ -63,20 +69,11 @@ class MyLossWeightCallback(Callback):
         self.gamma = self.gamma
 
 
-class MultitaskDEC(DEC):
+class MultitaskDEC(decv2.DECv2):
 
     def __init__(self, config, input_shape):
-        super().__init__(
-            n_clusters=config.n_clusters,
-            dims=[input_shape[1]] + config.nodes,
-            batch_size=config.batch_size)
-
-        print(self.dims)
+        super().__init__(config, input_shape)
         self.metrics = None
-
-        self.n_classes = config.n_classes
-        self.n_clusters = config.n_clusters
-        self.config = config
 
     def init(self, x_train, verbose=True):
         ae_weights, dec_weights = self.config.save_weights
@@ -97,11 +94,25 @@ class MultitaskDEC(DEC):
         input_shape = x_train.shape
 
         self = cls(config, input_shape)
+        with open(os.path.join(save_dir, 'metrics.pkl'), 'rb') as f:
+            self.metrics = pickle.load(f)
+
         self.init(x_train, verbose)
         self.build_model(0, 0, 0, None, None)
         self.model.load_weights(dec_weights, by_name=True)
 
         return self
+
+    def calculate_metrics(self, train, test):
+        c_map = self.get_cluster_map(train[0], train[1])[0]
+
+        x, y = test
+        y_pred = self.model.predict(x)[0]
+
+        y = np_utils.to_categorical(y)
+        y_pred = np_utils.to_categorical(y_pred)
+
+        return self._calculate_metrics(x, y, y_pred, c_map)
 
     def _calculate_metrics(self, x, y, y_pred, c_map):
         cluster_pred = self.model.predict(x, verbose=0)[1].argmax(1)
@@ -174,7 +185,6 @@ class MultitaskDEC(DEC):
 
             loss=None,
             loss_weights=None):
-
         train_data = (train_data[0], np_utils.to_categorical(train_data[1]))
         train_dev_data = \
             (train_dev_data[0], np_utils.to_categorical(train_dev_data[1]))
@@ -195,6 +205,9 @@ class MultitaskDEC(DEC):
 
         ae_weights, dec_weights = self.config.save_weights
         save_dir = self.config.save_dir
+
+        best_model_fname = os.path.join(save_dir, 'best_train_dev_loss.h5')
+        intermediate_model_fname = os.path.join(save_dir, 'DEC_model_{}.h5')
 
         if not os.path.isdir(save_dir):
             raise FileNotFoundError(
@@ -245,6 +258,8 @@ class MultitaskDEC(DEC):
 
         best_train_dev_loss = [np.inf, np.inf, np.inf]
         logger.debug('start training')
+
+        ite = 0
         for ite in range(int(maxiter)):
             if ite % update_interval == 0:
                 q = self.model.predict(x, verbose=0)[1]
@@ -288,8 +303,7 @@ class MultitaskDEC(DEC):
                         print('saving model: {} -> {}'.format(
                             best_train_dev_loss, train_dev_loss))
                         print('saving model: ', best_train_dev_loss, ' -> ', train_dev_loss)
-                        self.model.save_weights(os.path.join(
-                            save_dir, 'best_train_dev_loss.h5'))
+                        self.model.save_weights(best_model_fname)
                         best_train_dev_loss = train_dev_loss
                         best_ite = ite
                         self.metrics.mark_best(ite)
@@ -299,6 +313,11 @@ class MultitaskDEC(DEC):
                 if ite > 0 and delta_label < tol:
                     print('delta_label {} < tol {}'.format(delta_label, tol))
                     print('Reached tolerance threshold. Stopping training.')
+                    break
+
+                if ite - best_ite > self.config.patience:
+                    print('ite-best_ite={}>{} -- Stopping'.format(
+                        ite-best_ite, self.config.patience))
                     break
                 
                 # Classification loss
@@ -334,24 +353,61 @@ class MultitaskDEC(DEC):
               # save intermediate model
             if ite % save_interval == 0:
                 # save IDEC model checkpoints
-                fname = os.path.join(save_dir, 'DEC_model_{}.h5'.format(ite))
+                fname = intermediate_model_fname.format(ite)
                 print('saving model to: {}'.format(fname))
                 self.model.save_weights(fname)
 
             self.metrics.save(os.path.join(
-                save_dir, 'metrics_intermediate.pkl'))
+                save_dir, 'metrics.pkl'))
 
             ite += 1
 
         # save the trained model
-        fname = os.path.join(save_dir, 'DEC_model_final.h5')
+        fname = os.path.join(
+            self.config.save_dir, 'DEC_model_{}.h5'.format(ite))
         print('saving model to: {}'.format(fname))
         self.model.save_weights(fname)
+
+        # Save best weights as DEC_model_final.h5, not current weights
+        shutil.copyfile(best_model_fname, self.config.save_weights[1])
 
         y_p = self.model.predict(x, verbose=0)[1].argmax(1)
         cluster_to_label_mapping, n_assigned_list, majority_class_fractions = \
             get_cluster_to_label_mapping_safe(
                 y[:,1], y_p, self.n_classes, self.n_clusters)
         return y_pred, self.metrics, best_ite
+
+    def report_run(self, splits):
+        name = self.config.name
+        save_dir = self.config.save_dir
+
+        x_train, y_train = splits['train']
+        x_train_dev, y_train_dev = splits['train_dev']
+        x_test, y_test = splits['test']
+
+        x = np.concatenate((x_train, x_train_dev))
+        y = np.concatenate((y_train, y_train_dev))
+
+        metrics = self.calculate_metrics((x, y), (x_test, y_test))
+
+        pca_plot, pca = pca_plotv2(
+            self, x_train, y_train, self.config.n_clusters, title=name)
+        pca_plot.savefig(os.path.join(save_dir, 'pca_plot.png'))
+
+        cmap = self.get_cluster_map(x_train, y_train)
+
+        with open(os.path.join(self.config.save_dir, 'report.pkl'), 'wb') as f:
+            pickle.dump({
+                'save_dir': save_dir,
+                'name': name,
+                'metrics': metrics,
+                'cmap': cmap}, f)
+
+        fig = plt.figure(figsize=(15, 8))
+        self.metrics.plot(fig, title=name)
+        fig.savefig(os.path.join(save_dir, 'train_metrics.png'))
+
+
+
 
 

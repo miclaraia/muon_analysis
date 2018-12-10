@@ -1,5 +1,7 @@
 import numpy as np
 import os
+import pickle
+import matplotlib.pyplot as plt
 
 from sklearn import metrics
 from sklearn.metrics import homogeneity_score
@@ -15,30 +17,24 @@ from sklearn.metrics import homogeneity_score
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
 from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
         calc_f1_score, one_percent_fpr
-from muon.dissolving.utils import Metrics
+from muon.dissolving.utils import Metrics, MetricsCombined
+from muon.dissolving.utils import pca_plotv2
 import muon.dissolving.utils
+import muon.dissolving.decv2 as decv2
 
 
-class Config(muon.dissolving.utils.Config):
+class Config(decv2.Config):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.save_interval = kwargs.get('save_interval') or 5
         self.update_interval = kwargs.get('update_interval') or 140
 
 
-class ReDEC(DEC):
+class ReDEC(decv2.DECv2):
     def __init__(self, config, input_shape):
-        super().__init__(
-            n_clusters=config.n_clusters,
-            dims=[input_shape[1]] + config.nodes,
-            batch_size=config.batch_size)
-
-        print(self.dims)
+        super().__init__(config, input_shape)
 
         self.metrics = None
-        self.n_classes = config.n_classes
-        self.n_clusters = config.n_clusters
-        self.config = config
 
     def init(self, x_train, verbose=True):
         ae_weights, dec_weights = self.config.save_weights
@@ -58,6 +54,9 @@ class ReDEC(DEC):
         input_shape = x_train.shape
 
         self = cls(config, input_shape)
+        with open(os.path.join(save_dir, 'metrics.pkl'), 'rb') as f:
+            self.metrics = pickle.load(f)
+
         self.init(x_train, verbose)
 
         return self
@@ -68,22 +67,22 @@ class ReDEC(DEC):
                 mdec.model.layers[1].layers[i].get_weights())
         self.model.layers[-1].set_weights(mdec.model.layers[2].get_weights())
 
-    def _calculate_metrics(self, x, y, c_map):
-        cluster_pred = self.model.predict(x, verbose=0).argmax(1)
-        f1c = calc_f1_score(y, cluster_pred, c_map)
-        h = homogeneity_score(y, cluster_pred)
-        nmi = metrics.normalized_mutual_info_score(y, cluster_pred)
+    # def _calculate_metrics(self, x, y, c_map):
+        # cluster_pred = self.model.predict(x, verbose=0).argmax(1)
+        # f1c = calc_f1_score(y, cluster_pred, c_map)
+        # h = homogeneity_score(y, cluster_pred)
+        # nmi = metrics.normalized_mutual_info_score(y, cluster_pred)
 
-        return np.nan, f1c, h, nmi
+        # return np.nan, f1c, h, nmi
 
-    def get_cluster_map(self, x, y, toprint=False):
-        train_q = self.model.predict(x, verbose=0)
-        # train_p = self.target_distribution(train_q)
-        c_map = get_cluster_to_label_mapping_safe(
-            y, train_q.argmax(1), self.n_classes, self.n_clusters,
-            toprint=toprint)
+    # def get_cluster_map(self, x, y, toprint=False):
+        # train_q = self.model.predict(x, verbose=0)
+        # # train_p = self.target_distribution(train_q)
+        # c_map = get_cluster_to_label_mapping_safe(
+            # y, train_q.argmax(1), self.n_classes, self.n_clusters,
+            # toprint=toprint)
 
-        return c_map
+        # return c_map
 
     def clustering(self,
                    train_data,
@@ -185,10 +184,47 @@ class ReDEC(DEC):
 
             if ite % update_interval == 0:
                 self.metrics.save(os.path.join(
-                    save_dir, 'metrics_intermediate.pkl'))
+                    save_dir, 'metrics.pkl'))
 
         # save the trained model
         print('saving model to:', save_dir + '/DEC_model_final.h5')
         self.model.save_weights(save_dir + '/DEC_model_final.h5')
 
         return y_pred, self.metrics
+
+    def report_run(self, splits):
+        name = self.config.name
+        save_dir = self.config.save_dir
+
+        x_train, y_train = splits['train']
+        x_train_dev, y_train_dev = splits['train_dev']
+        x_test, y_test = splits['test']
+
+        x = np.concatenate((x_train, x_train_dev))
+        y = np.concatenate((y_train, y_train_dev))
+
+        metrics = self.calculate_metrics((x, y), (x_test, y_test))
+
+        pca_plot, pca = pca_plotv2(
+            self, x_train, y_train, self.config.n_clusters, title=name)
+        pca_plot.savefig(os.path.join(save_dir, 'pca_plot.png'))
+
+        cmap = self.get_cluster_map(x_train, y_train)
+
+        with open(os.path.join(self.config.save_dir, 'report.pkl'), 'wb') as f:
+            pickle.dump({
+                'save_dir': save_dir,
+                'name': name,
+                'metrics': metrics,
+                'cmap': cmap}, f)
+
+        with open(os.path.join(save_dir, 'metrics.pkl'), 'rb') as f:
+            source_metrics = pickle.load(f)
+            if source_metrics.best_ite is None:
+                source_metrics.best_ite = source_metrics.metrics[-1]['iteration']
+        train_metrics = MetricsCombined(source_metrics, self.metrics)
+
+        fig = plt.figure(figsize=(15, 8))
+        train_metrics.plot(fig, title=name)
+        fig.savefig(os.path.join(save_dir, 'train_metrics.png'))
+
