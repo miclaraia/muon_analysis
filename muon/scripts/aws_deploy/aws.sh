@@ -6,13 +6,13 @@ THIS="$(readlink -f ${BASH_SOURCE[0]})"
 
 get_host() {
     if [[ "$1" == "gpu" ]]; then
-        HOST="ec2-3-17-23-132.us-east-2.compute.amazonaws.com"
+        HOST="ec2-3-17-27-155.us-east-2.compute.amazonaws.com"
         TYPE="ubuntu"
     elif [[ "$1" == "setup" ]]; then
         HOST="ec2-18-188-95-229.us-east-2.compute.amazonaws.com"
         TYPE="ubuntu"
     elif [[ "$1" == "gpu2" ]]; then
-        HOST="ec2-3-17-29-96.us-east-2.compute.amazonaws.com"
+        HOST="ec2-18-224-39-95.us-east-2.compute.amazonaws.com"
         TYPE="ubuntu"
     fi
     echo $HOST
@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
             get_host $2
             shift 2
             ;;
-        --device)
+        -d|--device)
             get_device $2
             shift 2
             ;;
@@ -111,8 +111,31 @@ EOF
                 -h ${HOST} -t ${TYPE} $@
 EOF
         ;;
-            
 
+    transfer)
+        $MUON/run upload
+        HOST1=$(get_host $1)
+        HOST2=$(get_host $2)
+        shift 2
+
+        cd $MUON
+        ssh zoo << EOF
+            source \$HOME/.profile
+            set -euxo pipefail
+            cd \$MUON/muon/scripts/aws_deploy
+            SSH1=\$(./ssh.sh -h ${HOST1} -t ${TYPE} -p)
+            SSH1_PRE="\$(python3 -c "print(' '.join('\${SSH1}'.split(' ')[:-1]))")"
+            HOST1="\$(python3 -c "print('\${SSH1}'.split(' ')[-1])")"
+            SSH2=\$(./ssh.sh -h ${HOST2} -t ${TYPE} -p)
+            SSH2_PRE="\$(python3 -c "print(' '.join('\${SSH2}'.split(' ')[:-1]))")"
+            HOST2="\$(python3 -c "print('\${SSH2}'.split(' ')[-1])")"
+            cd /tmp
+            rsync -rPv -e "\$SSH1_PRE" \
+                \$HOST1:/mnt/muon/data/clustering_models/$1/. muon_transfer
+            rsync -rPv -e "\$SSH2_PRE" \
+                muon_transfer/. \$HOST2:/mnt/muon/data/clustering_models/$1
+            rm -R muon_transfer
+EOF
 
 esac
 

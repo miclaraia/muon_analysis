@@ -13,18 +13,13 @@ upload () {
         --exclude="*.csv" \
         --exclude="*.json" \
         muon zoo:/home/larai002/Zooniverse/repos/muon/
-    rsync setup.py zoo:/home/larai002/Zooniverse/repos/muon
-    
-    cd $ZOO/zootools
-    git archive --format=tar.gz --prefix=zootools master > /tmp/zootools.tar.gz
-    scp /tmp/zootools.tar.gz zoo:/home/larai002/Zooniverse/repos/zootools.tar.gz
-    ssh zoo << EOF
-        source \${HOME}/.profile
-        cd \${ZOO}
-        tar -zxvf zootools.tar.gz
-        rm zootools.tar.gz
-EOF
+    rsync -rcv \
+        --exclude="__pycache__" \
+        --exclude="*.pkl" \
+        muon/scripts/models \
+        zoo:/home/larai002/Zooniverse/repos/muon/muon/scripts/
 
+    rsync setup.py zoo:/home/larai002/Zooniverse/repos/muon
 }
 
 desktop () {
