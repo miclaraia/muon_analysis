@@ -8,11 +8,14 @@ import matplotlib.pyplot as plt
 from collections import OrderedDict
 import csv
 import h5py
+import logging
 
 import muon.project.panoptes as panoptes
 import muon.config
 
 import muon.data
+
+logger = logging.getLogger(__name__)
 
 
 class Image:
@@ -122,7 +125,7 @@ class Image:
         Return the subject that should be at the given x,y coordinates
         """
         meta = self.metadata['figure']
-        print(meta)
+        logger.debug(meta)
         dpi = meta['dpi']
         offset = meta['offset']*dpi
         height = meta['height']*dpi-offset
@@ -138,20 +141,20 @@ class Image:
 
         y_ = height/meta['rows']
         x_ = width/meta['cols']
-        print('x: ', x)
-        print('y: ', y)
-        print('offset: ', offset)
-        print('width: ', width)
-        print('height: ', height)
+        logger.debug('x: {}'.format(x))
+        logger.debug('y: {}'.format(y))
+        logger.debug('offset: {}'.format(offset))
+        logger.debug('width: {}'.format(width))
+        logger.debug('height: {}'.format(height))
 
-        print('x_: ', x_)
-        print('y_: ', y_)
+        logger.debug('x_: {}'.format(x_))
+        logger.debug('y_: {}'.format(y_))
 
         x = (x-offset)//x_
         y = (y-offset)//y_
 
         i = int(x+meta['cols']*y)
-        print(i)
+        logger.debug(i)
         return self.subjects[i]
 
 

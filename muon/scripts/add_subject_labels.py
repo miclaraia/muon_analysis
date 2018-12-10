@@ -13,9 +13,9 @@ agg_data_f = os.path.join(
 
 
 @click.group(invoke_without_command=True)
-@click.argument('name')
-@click.argument('labels_csv')
-@click.argument('subjects_h5')
+@click.option('--name', required=True)
+@click.option('--labels_csv', required=True)
+@click.option('--subjects_h5', required=True)
 def main(name, labels_csv, subjects_h5):
     labels = []
     print('Starting')

@@ -19,13 +19,21 @@ cp subject_data_v2.hdf5 ${SUBJECTS}
 # python $MUON/muon/scripts/mh2_dump_volunteer_labels.py \
 #   ${EXPORT} ${IMAGES} ${LABELS1}
 
-cd $MUOND/subjects
 echo "Adding volunteer labels to subjects file"
-python $MUON/muon/scripts/add_subject_labels.py volunteer_majority \
-  ${LABELS1} ${SUBJECTS}
+python $MUON/muon/scripts/add_subject_labels.py \
+    --name volunteer_majority \
+    --labels_csv ${LABELS1} \
+    --subjects_h5 ${SUBJECTS}
 
 echo "Adding hugh labels to subjects file"
-python $MUON/muon/scripts/add_subject_labels.py hugh \
-  ${LABELS2} ${SUBJECTS}
+python $MUON/muon/scripts/add_subject_labels.py \
+    --name hugh \
+    --labels_csv ${LABELS2} \
+    --subjects_h5 ${SUBJECTS}
+
+python $MUON/muon/scripts/add_subject_labels.py \
+    --name swap \
+    --labels_csv ${MUOND}/zooniverse/MH2/swap_labels.csv \
+    --subjects_h5 ${SUBJECTS}
 
 

@@ -1,12 +1,14 @@
-
 import click
 import csv
 from tqdm import tqdm
 import logging
-import time
+from tqdm import tqdm
 
 from muon.project.hdf_images import HDFImages
 from zootools.data_parsing import Parser, GridAggregate
+
+from swap.utils.config import Config
+from swap.utils.control import SWAP
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -16,11 +18,11 @@ logger.handlers[0].setLevel(logging.INFO)
 @click.group(invoke_without_command=True)
 @click.option('--export', required=True)
 @click.option('--images', required=True)
-@click.option('--majority_output')
-@click.option('--fraction_output')
-@click.option('--first_output')
+@click.option('--score_output')
+@click.option('--label_output')
 @click.option('--threshold', type=float, default=0.5)
-def main(export, images, majority_output, fraction_output, first_output, threshold):
+@click.option('--golds', required=True)
+def main(export, images, score_output, label_output, golds, threshold):
     tasks = {'T0': 'choice',
              'T1': 'grid',
              'T2': 'grid'}
@@ -59,40 +61,44 @@ def main(export, images, majority_output, fraction_output, first_output, thresho
         subject_map, location_callback, answer_map, 'T0', ('T1', 'T2'))
 
     print(sum([len(v) for v in subject_map.values()]), len(image_group_map))
-    print('Waiting 10 seconds')
-    time.sleep(10)
-    aggregated = grid_aggregate.aggregate(parser(export))
-    print(len(aggregated))
+    aggregated = grid_aggregate.aggregate_swap(parser(export))
 
-    if majority_output:
-        logger.info('Writing majority output')
-        with open(majority_output, 'w') as file:
-            writer = csv.DictWriter(file, ['subject', 'label'])
+
+    # Load gold labels from csv
+    with open(golds, 'r') as f:
+        reader = csv.DictReader(f)
+        golds = []
+        for row in reader:
+            # need to cast subjects and labels as ints for swap to work
+            golds.append((int(row['subject']), int(row['label'])))
+
+    config = Config(name='muon')
+    swap = SWAP(config)
+    swap.apply_golds(golds)
+
+    i = 0
+    for subject, user, cl in tqdm(aggregated):
+        swap.classify(user, subject, cl, i)
+        i += 1
+    swap()
+
+    if score_output:
+        with open(score_output, 'w') as f:
+            writer = csv.DictWriter(f, ['subject', 'label'])
             writer.writeheader()
-            for s in tqdm(aggregated):
-                annotations = aggregated[s]
-                label = sum(annotations)/len(annotations)
-                writer.writerow({'subject': s, 'label': int(label>threshold)})
+            for subject in swap.subjects.iter():
+                writer.writerow({'subject': subject.id, 'label': subject.score})
 
-    if fraction_output:
-        logger.info('Writing fraction output')
-        with open(fraction_output, 'w') as file:
-            writer = csv.DictWriter(file, ['subject', 'label'])
+    if label_output:
+        with open(label_output, 'w') as f:
+            writer = csv.DictWriter(f, ['subject', 'label'])
             writer.writeheader()
-            for s in tqdm(aggregated):
-                annotations = aggregated[s]
-                fraction = sum(annotations)/len(annotations)
-                writer.writerow({'subject': s, 'label': fraction})
-
-
-    if first_output:
-        logger.info('Writing first output')
-        with open(first_output, 'w') as file:
-            writer = csv.DictWriter(file, ['subject', 'label'])
-            writer.writeheader()
-            for s in tqdm(aggregated):
-                writer.writerow({'subject': s, 'label': aggregated[s][0]})
+            for subject in swap.subjects.iter():
+                writer.writerow({
+                    'subject': subject.id,
+                    'label': int(subject.score>threshold)})
 
 
 if __name__ == '__main__':
     main()
+
