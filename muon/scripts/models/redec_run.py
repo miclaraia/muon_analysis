@@ -33,16 +33,16 @@ def load_metrics(save_dir):
 @click.option('--save_interval', default=5, type=int)
 @click.option('--update_interval', default=140, type=int)
 def main(
-         source_dir,
-         model_name,
-         name,
-         batch_size,
-         lr,
-         momentum,
-         tol,
-         epochs,
-         save_interval,
-         update_interval):
+        source_dir,
+        model_name,
+        name,
+        batch_size,
+        lr,
+        momentum,
+        tol,
+        epochs,
+        save_interval,
+        update_interval):
 
     model_name = '{}-{}'.format(
         model_name, datetime.now().isoformat(timespec='seconds'))
@@ -81,7 +81,7 @@ def main(
         'splits_file': splits_file,
         'n_classes': 2,
         'n_clusters': source_config.n_clusters,
-        'update_inteval': 1,
+        'update_inteval': update_interval,
         'nodes': source_config.nodes,
         'batch_size': batch_size,
         'optimizer': ('SGD', {'lr': lr, 'momentum': momentum}),

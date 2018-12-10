@@ -4,6 +4,8 @@ import numpy as np
 import pickle
 import json
 import os
+import csv
+import pandas
 from collections import OrderedDict
 
 from sklearn.decomposition import PCA
@@ -185,22 +187,35 @@ class Metrics:
         with open(fname, 'wb') as f:
             pickle.dump(self, f)
 
-    def plot(self, fig, title=None):
+    def _plot_one(self, ax, key, title=None, standard_metrics=None):
         data = self.zip()
-        for i, key in enumerate(self._metric_names):
-            ax = fig.add_subplot(221+i)
+        key1 = 'train_{}'.format(key)
+        key2 = 'valid_{}'.format(key)
 
-            key1 = 'train_{}'.format(key)
-            key2 = 'valid_{}'.format(key)
+        x = data['iteration']
+        y1, y2 = zip(*data[key])
 
-            x = data['iteration']
-            y1, y2 = zip(*data[key])
+        ax.plot(x, y1)
+        ax.plot(x, y2)
 
-            ax.plot(x, y1)
-            ax.plot(x, y2)
+        ax.legend([key1, key2])
+        ax.set_ylim((0,1))
 
-            ax.legend([key1, key2])
-            ax.set_title(key)
+        if standard_metrics:
+            standard_metrics.plot(ax, key)
+        ax.set_title(title or key)
+
+    def plot(self, fig, title=None, standard_metrics=None, keys=None):
+        keys = keys or self._metric_names
+        if len(keys) == 1:
+            subs = 111
+        else:
+            subs = 2, np.ceil(len(keys)/2).astype(int), 1
+            subs = sum([10**(2-i)*subs[i] for i in range(3)])
+
+        for i, key in enumerate(keys):
+            ax = fig.add_subplot(subs + i)
+            self._plot_one(ax, key, None, standard_metrics)
 
         fig.suptitle(title)
         return fig
@@ -255,7 +270,69 @@ class MetricsCombined:
 
         fig.suptitle(title)
         return fig
+
+
+class StandardMetrics:
+
+    def __init__(self):
+        self.metrics = {}
+        self.fields = ['name', 'f1', 'h', 'nmi', 'precision', 'recall']
+
+    def add(self, name, y, y_pred):
+        item = self.calculate_metrics(y, y_pred, name)
+        self.metrics[name] = item
+
+    def dump(self, fname):
+        with open(fname, 'w') as f:
+            writer = csv.DictWriter(f, fieldnames=self.fields)
+            for name in self.metrics:
+                writer.writerow(self.metrics[name])
+
+    def to_df(self):
+        return pandas.DataFrame(list(self.metrics.values()), columns=self.fields)
+
+    def __str__(self):
+        return str(self.to_df())
+
+    @staticmethod
+    def precision(y, y_pred):
+        #tp/(tp+fp)
+        i = np.where(y_pred==1)
+        return sum(y[i])/sum(y_pred)
+
+    @staticmethod
+    def recall(y, y_pred):
+        # tp/(tp+fn)
+        i = np.where(y_pred==1)
+        return sum(y[i]) / sum(y)
         
+    @classmethod
+    def calculate_metrics(cls, y, y_pred, name):
+        f1 = f1_score(y, y_pred)
+        h = homogeneity_score(y, y_pred)
+        nmi = metrics.normalized_mutual_info_score(y, y_pred)
+        precision = cls.precision(y, y_pred)
+        recall = cls.recall(y, y_pred)
+
+        return {
+            'name': name, 'f1': f1, 'h': h, 'nmi': nmi,
+            'precision': precision, 'recall': recall}
+    
+    def plot(self, ax, key):
+        if key == 'f1c':
+            key = 'f1'
+        if key in self.fields:
+            l = list(self.metrics)
+            y = [self.metrics[i][key] for i in l]
+
+            ax2 = ax.twinx()
+            ax2.set_yticks(y)
+            ax2.set_yticklabels(l)
+
+            for _y in y:
+                ax2.axhline(_y, linestyle='--', alpha=.5)
+
+            ax2.set_ylim(ax.get_ylim())
 
 
 def one_percent_fpr(y, pred, fom):
