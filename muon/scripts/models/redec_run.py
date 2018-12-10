@@ -24,6 +24,7 @@ def load_metrics(save_dir):
 @click.group(invoke_without_command=True)
 @click.option('--source_dir', required=True)
 @click.option('--model_name', required=True)
+@click.option('--name', required=True)
 @click.option('--batch_size', default=256, type=int)
 @click.option('--lr', default=0.01, type=float)
 @click.option('--momentum', default=0.9, type=float)
@@ -34,6 +35,7 @@ def load_metrics(save_dir):
 def main(
          source_dir,
          model_name,
+         name,
          batch_size,
          lr,
          momentum,
@@ -48,6 +50,8 @@ def main(
         os.getenv('MUOND'), 'clustering_models', model_name)
     if os.path.isdir(save_dir):
         raise FileExistsError(save_dir)
+    if not os.path.isdir(source_dir):
+        raise FileNotFoundError(source_dir)
     os.makedirs(save_dir)
 
     source_config = MultitaskConfig.load(os.path.join(
@@ -72,6 +76,7 @@ def main(
 
     config_args = {
         'save_dir': save_dir,
+        'name': name,
         'source_dir': source_dir,
         'splits_file': splits_file,
         'n_classes': 2,
@@ -114,6 +119,8 @@ def main(
         pickle.dump({
             'y_pred': y_pred,
             'metrics': metrics}, f)
+
+    redec.report_run(splits)
 
 if __name__ == '__main__':
     main()

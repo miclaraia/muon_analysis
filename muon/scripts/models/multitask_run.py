@@ -6,16 +6,17 @@ import shutil
 from datetime import datetime
 
 from muon.dissolving.multitask import MultitaskDEC, Config
-import muon.deep_clustering.clustering
+from muon.dissolving.decv2 import Config as SourceConfig
+#import muon.deep_clustering.clustering
 
 
 def data_path(*args):
     return os.path.join(os.getenv('MUOND'), *args)
 
 @click.group(invoke_without_command=True)
-@click.option('--splits_file', required=True)
 @click.option('--source_dir', required=True)
 @click.option('--model_name', required=True)
+@click.option('--name', required=True)
 @click.option('--batch_size', type=int)
 @click.option('--lr', type=float, default=0.01)
 @click.option('--momentum', type=float, default=0.9)
@@ -26,7 +27,6 @@ def data_path(*args):
 @click.option('--beta', type=float)
 @click.option('--gamma', type=float)
 def main(
-        splits_file,
         source_dir,
         model_name,
         batch_size,
@@ -34,6 +34,7 @@ def main(
         momentum,
         tol,
         maxiter,
+        name,
         save_interval,
         alpha, beta, gamma):
 
@@ -43,7 +44,13 @@ def main(
         os.getenv('MUOND'), 'clustering_models', model_name)
     if os.path.isdir(save_dir):
         raise FileExistsError(save_dir)
+    if not os.path.isdir(source_dir):
+        raise FileNotFoundError(source_dir)
     os.makedirs(save_dir)
+
+    source_config = SourceConfig.load(os.path.join(
+        source_dir, 'config.json'))
+    splits_file = source_config.splits_file
 
     with open(splits_file, 'rb') as f:
         splits = pickle.load(f)
@@ -59,12 +66,10 @@ def main(
     y_train = y_train[order]
     print(x_train.shape, x_test.shape, x_valid.shape, x_train_dev.shape)
 
-    source_config = muon.deep_clustering.clustering.Config.load(os.path.join(
-        source_dir, 'config.json'))
-
     config_args = {
         'save_dir': save_dir,
         'source_dir': source_dir,
+        'name': name,
         'splits_file': splits_file,
         'n_classes': 2,
         'n_clusters': source_config.n_clusters,
@@ -107,6 +112,8 @@ def main(
             'y_pred': y_pred,
             'metrics': metrics,
             'best_ite': best_ite}, f)
+
+    dec.report_run(splits)
 
 
 if __name__ == '__main__':

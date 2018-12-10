@@ -15,11 +15,13 @@ def data_path(*args):
 @click.group(invoke_without_command=True)
 @click.option('--splits_file', required=True)
 @click.option('--model_name', required=True)
+@click.option('--name', required=True)
 @click.option('--batch_size', type=int)
 @click.option('--lr', type=float, default=0.01)
 @click.option('--momentum', type=float, default=0.9)
 @click.option('--tol', type=float)
 @click.option('--maxiter', type=int)
+@click.option('--n_clusters', type=int)
 @click.option('--save_interval', type=int)
 def main(
         splits_file,
@@ -29,7 +31,9 @@ def main(
         momentum,
         tol,
         maxiter,
-        save_interval):
+        n_clusters,
+        save_interval,
+        name):
 
     model_name = '{}-{}'.format(
         model_name, datetime.now().replace(microsecond=0).isoformat())
@@ -55,10 +59,11 @@ def main(
 
     config_args = {
         'save_dir': save_dir,
+        'name': name,
         'source_dir': None,
         'splits_file': splits_file,
         'n_classes': 2,
-        'n_clusters': 50,
+        'n_clusters': n_clusters,
         'update_inteval': 1,
         'batch_size': batch_size,
         'optimizer': ('SGD', {'lr': lr, 'momentum': momentum}),
@@ -75,7 +80,6 @@ def main(
     config = Config(**config_args)
     config.dump()
 
-
     dec = DECv2(config, x_train.shape)
     dec.init(x_train)
 
@@ -84,8 +88,7 @@ def main(
         (x_train_dev, y_train_dev),
         (x_valid, y_valid))
 
-    with open(os.path.join(save_dir, 'results_final.pkl'), 'wb') as f:
-        pickle.dump({'y_pred': y_pred}, f)
+    dec.report_run(splits)
 
 
 if __name__ == '__main__':
