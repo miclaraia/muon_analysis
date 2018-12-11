@@ -1,0 +1,20 @@
+save_dir                                                                                                    ,name                                          ,active           
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/original_dec                                                                          ,original dec                                  ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/dec_1-2018-12-09T03:56:15                                        ,norotation dec 50 clusters                    ,0              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/multitask_1-2018-12-09T06:54:30                                  ,norotation multitask 50 clusters              ,0              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/redec_1-2018-12-09T08:13:14                                      ,norotation redec 50 clusters                  ,0              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/dec_2-2018-12-09T06:25:30                                        ,norotation dec 10 clusters                    ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/multitask_1-2018-12-09T10:38:26                                  ,norotation multitask 10 clusters              ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/redec_1-2018-12-09T17:20:11/                                     ,norotation redec 10 clusters                  ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/dec_1-2018-12-09T08:29:41                                        ,norotation dec 10 clusters no y               ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/multitask_1-2018-12-09T09:52:20                                  ,norotation multitask 10 clusters no y         ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/redec_1-2018-12-09T17:17:21                                      ,norotation redec 10 clusters no y             ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/dec_1-2018-12-09T17:58:33                                        ,norotation dec 50 clusters no y               ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/multitask_1-2018-12-09T21:54:47/                                 ,norotation multitask 50 clusters no y         ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/redec_1-2018-12-09T22:21:22                                      ,norotation redec 50 clusters no y             ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/rotation/dec_1-2018-12-09T18:36:16                                          ,rotation dec 50 clusters                      ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/rotation/multitask_1-2018-12-09T22:36:29/                                   ,rotation multitask 50 clusters                ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/multitask_1-2018-12-09T23:42:14                                  ,norotation multitask 10 clusters no y v2      ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/redec_1-2018-12-10T00:09:14                                      ,norotation redec 10 clusters no y v2          ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/redec_1-2018-12-10T01:09:38,norotation redec 50 clusters no y v2          ,1              
+/data/lucifer1.2/users/larai002/muon_data/clustering_models/aws/decv2/norotation/multitask_1-2018-12-10T02:26:39,norotation dec 50 clusters no y v2-1          ,1              
