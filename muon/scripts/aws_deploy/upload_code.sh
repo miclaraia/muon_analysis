@@ -47,7 +47,7 @@ SSH_PRE="$(python3 -c "print(' '.join('${SSH}'.split(' ')[:-1]))")"
 HOST="$(python3 -c "print('${SSH}'.split(' ')[-1])")"
 
 rsync -e "$SSH_PRE" ${HERE}/muon.env ${HOST}:\${HOME}
-rsync -rv -e "$SSH_PRE" \
+rsync -rpv -e "$SSH_PRE" \
     --exclude="__pycache__" \
     --exclude="*.pkl" \
     --exclude="*.csv" \

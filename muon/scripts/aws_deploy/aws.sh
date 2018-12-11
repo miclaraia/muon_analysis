@@ -6,13 +6,13 @@ THIS="$(readlink -f ${BASH_SOURCE[0]})"
 
 get_host() {
     if [[ "$1" == "gpu" ]]; then
-        HOST="ec2-3-17-27-155.us-east-2.compute.amazonaws.com"
+        HOST="ec2-3-16-11-25.us-east-2.compute.amazonaws.com"
         TYPE="ubuntu"
     elif [[ "$1" == "setup" ]]; then
         HOST="ec2-18-188-95-229.us-east-2.compute.amazonaws.com"
         TYPE="ubuntu"
     elif [[ "$1" == "gpu2" ]]; then
-        HOST="ec2-18-224-39-95.us-east-2.compute.amazonaws.com"
+        HOST="ec2-18-216-233-172.us-east-2.compute.amazonaws.com"
         TYPE="ubuntu"
     fi
     echo $HOST

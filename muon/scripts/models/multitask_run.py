@@ -15,6 +15,7 @@ def data_path(*args):
 
 @click.group(invoke_without_command=True)
 @click.option('--source_dir', required=True)
+@click.option('--save_dir')
 @click.option('--model_name', required=True)
 @click.option('--name', required=True)
 @click.option('--batch_size', type=int)
@@ -26,8 +27,10 @@ def data_path(*args):
 @click.option('--alpha', type=float)
 @click.option('--beta', type=float)
 @click.option('--gamma', type=float)
+@click.option('--patience', type=int)
 def main(
         source_dir,
+        save_dir,
         model_name,
         batch_size,
         lr,
@@ -36,12 +39,13 @@ def main(
         maxiter,
         name,
         save_interval,
-        alpha, beta, gamma):
+        alpha, beta, gamma, patience):
 
-    model_name = '{}-{}'.format(
-        model_name, datetime.now().replace(microsecond=0).isoformat())
-    save_dir = os.path.join(
-        os.getenv('MUOND'), 'clustering_models', model_name)
+    if not save_dir:
+        model_name = '{}-{}'.format(
+            model_name, datetime.now().replace(microsecond=0).isoformat())
+        save_dir = os.path.join(
+            os.getenv('MUOND'), 'clustering_models', model_name)
     if os.path.isdir(save_dir):
         raise FileExistsError(save_dir)
     if not os.path.isdir(source_dir):
@@ -82,7 +86,8 @@ def main(
         'save_interval': save_interval,
         'alpha': alpha,
         'beta': beta,
-        'gamma': gamma
+        'gamma': gamma,
+        'patience': patience,
     }
 
     ae_weights = os.path.join(source_dir, 'ae_weights.h5')

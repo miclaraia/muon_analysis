@@ -35,7 +35,7 @@ class Config:
         self.tol = kwargs.get('tol') or .001
         self.maxiter = kwargs.get('maxiter') or 80
         self.save_interval = kwargs.get('save_interval') or 5
-        self.update_interval = kwargs.get('update_interval') or 1
+        self.update_interval = kwargs.get('update_interval') or 140
 
         self.splits_file = splits_file
         self.source_dir = source_dir

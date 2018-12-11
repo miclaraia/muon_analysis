@@ -65,6 +65,7 @@ rsync -rcPv -e "$SSH_PRE" \
     --exclude 'clustering_models/run*' \
     --exclude 'clustering_models/hugh' \
     --exclude 'clustering_models/volunteer' \
+    --exclude 'clustering_models/decv2' \
     ${MUOND} $HOST:/mnt/muon/data
 rm /tmp/upload_aws_muon_files.txt
 

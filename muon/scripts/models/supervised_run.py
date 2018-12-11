@@ -5,7 +5,7 @@ import click
 import shutil
 from datetime import datetime
 
-from muon.dissolving.decv2 import DECv2, Config
+from muon.dissolving.supervised import Supervised, Config
 
 
 def data_path(*args):
@@ -19,10 +19,7 @@ def data_path(*args):
 @click.option('--batch_size', type=int)
 @click.option('--lr', type=float, default=0.01)
 @click.option('--momentum', type=float, default=0.9)
-@click.option('--tol', type=float)
-@click.option('--maxiter', type=int)
-@click.option('--n_clusters', type=int)
-@click.option('--save_interval', type=int)
+@click.option('--epochs', type=int)
 def main(
         splits_file,
         save_dir, 
@@ -30,10 +27,7 @@ def main(
         batch_size,
         lr,
         momentum,
-        tol,
-        maxiter,
-        n_clusters,
-        save_interval,
+        epochs,
         name):
 
     if not save_dir:
@@ -62,29 +56,23 @@ def main(
     config_args = {
         'save_dir': save_dir,
         'name': name,
-        'source_dir': None,
         'splits_file': splits_file,
         'n_classes': 2,
-        'n_clusters': n_clusters,
         'batch_size': batch_size,
         'optimizer': ('SGD', {'lr': lr, 'momentum': momentum}),
-        'tol': tol,
-        'maxiter': maxiter,
-        'save_interval': save_interval,
+        'maxiter': epochs,
+        'source_dir': None,
         'source_weights': (None, None),
+        'save_weights': os.path.join(save_dir, 'model_weights_final.h5')
     }
-
-    ae_weights = os.path.join(save_dir, 'ae_weights.h5')
-    dec_weights = os.path.join(save_dir, 'DEC_model_final.h5')
-    config_args['save_weights'] = ae_weights, dec_weights
 
     config = Config(**config_args)
     config.dump()
 
-    dec = DECv2(config, x_train.shape)
-    dec.init(x_train)
+    dec = Supervised(config, x_train.shape)
+    dec.init()
 
-    y_pred = dec.clustering(
+    y_pred = dec.train(
         (x_train, y_train),
         (x_train_dev, y_train_dev),
         (x_valid, y_valid))
@@ -94,3 +82,4 @@ def main(
 
 if __name__ == '__main__':
     main()
+

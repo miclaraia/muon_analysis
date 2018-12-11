@@ -75,6 +75,11 @@ def main(subject_data, train_label_name, true_label_name, splits_out, xy_out,
     storage = Storage(subject_data)
     label_keys = {'train': train_label_name, 'true': true_label_name}
 
+    if train_rotation or true_rotation:
+        # if train_rotation is truen and true_rotation is false then the sets
+        # below will not be comparable. One will labels subjects as 'sid', the
+        # other with 'sid_n'. The set difference doesn't work in that case
+        raise Exception('Rotation overlap checking currently doesn\'t work')
     train_labels = set(get_labels(storage, label_keys['train'], train_rotation))
     true_labels = set(get_labels(storage, label_keys['true'], true_rotation))
     all_labels = list(train_labels | true_labels)

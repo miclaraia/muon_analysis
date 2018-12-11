@@ -23,6 +23,7 @@ def load_metrics(save_dir):
 
 @click.group(invoke_without_command=True)
 @click.option('--source_dir', required=True)
+@click.option('--save_dir')
 @click.option('--model_name', required=True)
 @click.option('--name', required=True)
 @click.option('--batch_size', default=256, type=int)
@@ -34,6 +35,7 @@ def load_metrics(save_dir):
 @click.option('--update_interval', default=140, type=int)
 def main(
         source_dir,
+        save_dir,
         model_name,
         name,
         batch_size,
@@ -44,10 +46,11 @@ def main(
         save_interval,
         update_interval):
 
-    model_name = '{}-{}'.format(
-        model_name, datetime.now().isoformat(timespec='seconds'))
-    save_dir = os.path.join(
-        os.getenv('MUOND'), 'clustering_models', model_name)
+    if not save_dir:
+        model_name = '{}-{}'.format(
+            model_name, datetime.now().isoformat(timespec='seconds'))
+        save_dir = os.path.join(
+            os.getenv('MUOND'), 'clustering_models', model_name)
     if os.path.isdir(save_dir):
         raise FileExistsError(save_dir)
     if not os.path.isdir(source_dir):
