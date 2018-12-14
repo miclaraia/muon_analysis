@@ -10,20 +10,22 @@ from muon.dissolving.decv2 import DECv2
 from muon.dissolving.multitask import MultitaskDEC
 from muon.dissolving.redec import ReDEC
 from muon.dissolving.supervised import Supervised
-from muon.dissolving.utils import Config
+from muon.dissolving.utils import Config, StandardMetrics
 
 
 @click.group(invoke_without_command=True)
 @click.argument('model')
-def main(model):
+@click.argument('standardmetrics')
+def main(model, standardmetrics):
     fname = os.path.join(
         os.getenv('MUON'), 'muon/scripts/models/decv2/{}.csv'.format(model))
     with open(fname) as f:
-        reader = csv.DictReader(f)
+        reader = csv.reader(f)
+        next(reader)
         runs = []
         for row in reader:
-            if int(row['active'].strip()):
-                runs.append(row['save_dir'].strip())
+            if int(row[2].strip()) and int(row[3].strip()):
+                runs.append(row[0].strip())
 
     for save_dir in runs:
         config = Config.load(os.path.join(save_dir, 'config.json'))
@@ -48,3 +50,5 @@ def main(model):
         print('running report')
         dec.report_run(splits)
 
+if __name__ == '__main__':
+    main()

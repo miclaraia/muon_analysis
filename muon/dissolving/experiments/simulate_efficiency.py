@@ -1,17 +1,22 @@
 import numpy as np
 import random
 from collections import Counter
+import pickle
 
-from muon.dissolving.decv2 import DECv2
+from keras import backend as K
+
+from dec_keras.DEC import DEC
 
 
 class EfficiencyStudy:
 
     @classmethod
-    def run(cls, save_dir, x, y, n_trials=5):
-        dec = DECv2.load(save_dir, x)
+    def run(cls, dec, x, y, n_trials=5):
+        if dec.__class__.__name__ == 'Supervised':
+            y_pred = np.argmax(dec.model.predict(x), axis=1)
+        else:
+            y_pred = dec.predict_clusters(x)
 
-        y_pred = dec.predict_clusters(x)
         n_classes = dec.config.n_classes
         n_clusters = dec.config.n_clusters
 
@@ -20,8 +25,12 @@ class EfficiencyStudy:
             total += cls._simulate(
                 y, y_pred, n_classes, n_clusters, sample_size=25)
         mean = total / float(n_trials)
-        print(mean)
-        return mean
+
+        reduction = mean / y.shape[0]
+        print('Average Clicks: ', mean)
+        print('N Subjects: ', y.shape[0])
+        print('Fraction', reduction)
+        return mean, reduction
 
     @staticmethod
     def _simulate(y, y_pred, n_classes, n_clusters, sample_size=25):

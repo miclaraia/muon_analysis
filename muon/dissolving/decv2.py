@@ -9,6 +9,7 @@ from sklearn.metrics import homogeneity_score
 
 import dec_keras.DEC
 import muon.deep_clustering.clustering
+from muon.dissolving.experiments.simulate_efficiency import EfficiencyStudy
 from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
         calc_f1_score, one_percent_fpr
 from muon.dissolving.utils import Metrics
@@ -116,10 +117,12 @@ class DECv2(dec_keras.DEC):
         pca_plot.savefig(os.path.join(save_dir, 'pca_plot.png'))
 
         cmap = self.get_cluster_map(x_train, y_train)
+        clicks = EfficiencyStudy.run(self, x_test, y_test)
 
         with open(os.path.join(self.config.save_dir, 'report.pkl'), 'wb') as f:
             pickle.dump({
                 'save_dir': save_dir,
                 'name': name,
                 'metrics': metrics,
+                'clicks': clicks,
                 'cmap': cmap}, f)

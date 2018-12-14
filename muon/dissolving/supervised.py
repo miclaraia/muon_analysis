@@ -28,10 +28,12 @@ from keras.utils import np_utils
 # from keras.models import load_model
 
 from dec_keras.DEC import DEC, ClusteringLayer
+from muon.dissolving.experiments.simulate_efficiency import EfficiencyStudy
 from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
         calc_f1_score, one_percent_fpr
 from muon.dissolving.utils import Metrics
 from muon.dissolving.utils import pca_plotv2
+from muon.dissolving.utils import StandardMetrics
 import muon.dissolving.utils
 import muon.dissolving.decv2 as decv2
 
@@ -153,6 +155,10 @@ class Supervised:
         print('saving model to {}'.format(fname))
         self.model.save_weights(fname)
 
+        with open(os.path.join(
+                self.config.save_dir, 'metrics.pkl'), 'wb') as f:
+            pickle.dump(self.metrics, f)
+
         print('best model at {}'.format(self.config.save_weights))
 
     # def clustering(
@@ -207,17 +213,24 @@ class Supervised:
         # pca_plot.savefig(os.path.join(save_dir, 'pca_plot.png'))
 
         # cmap = self.get_cluster_map(x_train, y_train)
+        clicks = EfficiencyStudy.run(self, x_test, y_test)
 
         with open(os.path.join(self.config.save_dir, 'report.pkl'), 'wb') as f:
             pickle.dump({
                 'save_dir': save_dir,
                 'name': name,
+                'clicks': clicks,
                 'metrics': metrics}, f)
 
+        standard_metrics = os.path.join(
+            os.getenv('MUOND'), 'subjects/standard_metrics.json')
+        if os.path.isfile(standard_metrics):
+            standard_metrics = StandardMetrics.load(standard_metrics)
+        else:
+            standard_metrics = None
+
         fig = plt.figure(figsize=(15, 8))
-        self.metrics.plot(fig, title=name)
+        self.metrics.plot(fig, title=name, standard_metrics=standard_metrics)
         fig.savefig(os.path.join(save_dir, 'train_metrics.png'))
-        with open(os.path.join(
-                self.config.save_dir, 'metrics.pkl'), 'wb') as f:
-            pickle.dump(self.metrics, f)
+
 

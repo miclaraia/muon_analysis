@@ -7,17 +7,15 @@ THIS="$(readlink -f ${BASH_SOURCE[0]})"
 cd ${HERE}
 
 upload () {
-    rsync -rv \
+    rsync -rpv \
         --exclude="__pycache__" \
         --exclude="*.pkl" \
         --exclude="*.csv" \
         --exclude="*.json" \
         muon zoo:/home/larai002/Zooniverse/repos/muon/
     rsync -rcv \
-        --exclude="__pycache__" \
-        --exclude="*.pkl" \
-        muon/scripts/models \
-        zoo:/home/larai002/Zooniverse/repos/muon/muon/scripts/
+        muon/scripts/models/decv2/*.csv \
+        zoo:/home/larai002/Zooniverse/repos/muon/muon/scripts/models/decv2
 
     rsync setup.py zoo:/home/larai002/Zooniverse/repos/muon
 }

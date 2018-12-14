@@ -31,9 +31,9 @@ def main(subject_file, splits_source, xy_source, xy_out, label_name):
         splits[k] = subjects.get_xy(subject_splits[k], label_name)
         print(splits[k][0].shape)
 
-    for k in splits_source:
+    for k in subject_splits:
         print(k)
-        assert len(splits_source[k]) == splits[k][0].shape[0]
+        assert len(subject_splits[k]) == splits[k][0].shape[0]
 
     with open(xy_out, 'wb') as f:
         pickle.dump(splits, f)

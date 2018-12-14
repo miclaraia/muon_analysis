@@ -15,9 +15,11 @@ from sklearn.metrics import homogeneity_score
 # from keras.models import load_model
 
 from dec_keras.DEC import DEC, ClusteringLayer, cluster_acc
+from muon.dissolving.experiments.simulate_efficiency import EfficiencyStudy
 from muon.dissolving.utils import get_cluster_to_label_mapping_safe, \
         calc_f1_score, one_percent_fpr
 from muon.dissolving.utils import Metrics, MetricsCombined
+from muon.dissolving.utils import StandardMetrics
 from muon.dissolving.utils import pca_plotv2
 import muon.dissolving.utils
 import muon.dissolving.decv2 as decv2
@@ -210,21 +212,30 @@ class ReDEC(decv2.DECv2):
         pca_plot.savefig(os.path.join(save_dir, 'pca_plot.png'))
 
         cmap = self.get_cluster_map(x_train, y_train)
+        clicks = EfficiencyStudy.run(self, x_test, y_test)
 
         with open(os.path.join(self.config.save_dir, 'report.pkl'), 'wb') as f:
             pickle.dump({
                 'save_dir': save_dir,
                 'name': name,
                 'metrics': metrics,
+                'clicks': clicks,
                 'cmap': cmap}, f)
 
-        with open(os.path.join(save_dir, 'metrics.pkl'), 'rb') as f:
+        with open(os.path.join(self.config.source_dir, 'metrics.pkl'), 'rb') as f:
             source_metrics = pickle.load(f)
             if source_metrics.best_ite is None:
                 source_metrics.best_ite = source_metrics.metrics[-1]['iteration']
         train_metrics = MetricsCombined(source_metrics, self.metrics)
 
+        standard_metrics = os.path.join(
+            os.getenv('MUOND'), 'subjects/standard_metrics.json')
+        if os.path.isfile(standard_metrics):
+            standard_metrics = StandardMetrics.load(standard_metrics)
+        else:
+            standard_metrics = None
+
         fig = plt.figure(figsize=(15, 8))
-        train_metrics.plot(fig, title=name)
+        train_metrics.plot(fig, title=name, standard_metrics=standard_metrics)
         fig.savefig(os.path.join(save_dir, 'train_metrics.png'))
 
