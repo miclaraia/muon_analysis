@@ -141,6 +141,9 @@ class Storage:
         subject = self._file['subjects'][id]
         return self._to_subject(id, subject)
 
+    def get_all_subjects(self):
+        return Subjects([self.get_subject(s) for s in self._file['subjects']])
+
     def get_subjects(self, subjects):
         subjects = [self.get_subject(s) for s in tqdm(subjects)]
         return Subjects(subjects)

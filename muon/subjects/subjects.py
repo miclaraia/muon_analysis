@@ -157,6 +157,12 @@ class Subjects:
 
         return x, y
 
+    def get_x(self, subjects):
+        x = np.zeros(self.get_dimensions())
+        for i, subject in enumerate(subjects):
+            x[i,:] = self.get_subject(subject).x
+        return x
+
     ##########################################################################
     ###   Operator Overloading   #############################################
     ##########################################################################

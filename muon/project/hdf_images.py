@@ -161,7 +161,17 @@ class Image:
 class ImageGroup:
 
     def __init__(self, group, images, **kwargs):
-        self.images = images
+        """
+        
+        Parameters:
+            group
+            images
+            image_size
+            width
+            description
+            permutations
+        """
+        self.images = images or {}
         self.group = group
         self.zoo_map = None
 
@@ -169,6 +179,54 @@ class ImageGroup:
         self.image_dim = kwargs.get('width', 10)
         self.description = kwargs.get('description', None)
         self.permutations = kwargs.get('permutations', 3)
+
+    @classmethod
+    def new(cls, group, next_id,
+            subject_storage, cluster_assignments, **kwargs):
+        """
+        Parameters:
+            next_id: callback function to get next image id
+            cluster_assignments: {cluster: [subject_id]}
+        """
+        self = cls(group, None, **kwargs)
+        self.add_clustered_subjects(
+            next_id, subject_storage, cluster_assignments)
+        return self
+
+        # images = {}
+        # i = next_id
+        # for c in cluster_assignments:
+            # cluster_subjects = subjects.subset(cluster_assignments[c])
+            # split_cluster = self.split_subjects(cluster_subjects)
+            
+            # for image_subjects in split_cluster:
+                # meta = {'cluster': c}
+                # images[i] = Image(i, self.group, image_subjects, meta)
+                # i += 1
+
+        # self.images = images
+        # return i, self
+
+    def add_clustered_subjects(
+            self, next_id, subject_storage, cluster_assignments):
+        """
+        Parameters:
+            next_id: next id for a new image
+            subjects
+            cluster_assignments: {cluster: [subject_id]}
+        """
+        for c in cluster_assignments:
+            meta = {'cluster': c}
+            cluster_subjects = subject_storage.get_subjects(cluster_assignments[c])
+            self.add_subjects(next_id, cluster_subjects, meta)
+
+    def add_subjects(self, next_id, subjects, meta):
+        for image_subjects in self.split_subjects(subjects):
+            id_ = next_id()
+            if id_ in self.images:
+                raise KeyError('image id {} already exists in group {}' \
+                    .format(id_, self.group))
+            self.images[id_] = Image(id_, self.group, image_subjects, meta)
 
     def __str__(self):
         s = 'group %s images %d metadata %s' % \
@@ -245,6 +303,12 @@ class ImageGroup:
             keys = subjects.keys()
             random.shuffle(keys)
 
+            # Sometimes the number of subjects in a cluster cannot be evenly
+            # split into N even sized images. In this case we add enough
+            # duplicate subjects to the last image to make it the same size
+            if len(keys) % self.size > 0:
+                keys += random.sample(keys, self.size - (len(keys) % 10))
+
             length = len(keys)
             w = math.ceil(length/self.size)
             for n in range(w):
@@ -311,31 +375,34 @@ class HDFImages:
 
         self.load_metadata()
 
-    def new_group(self, subjects, image_size, **kwargs):
+    def new_group(self, subjects, cluster_assignments, image_size, **kwargs):
         """
         Generate a file detailing which subjects belong in which image
         and their location in the image.
 
         """
-        images = {}
-        i = self.next_id
+        # images = {}
+        # i = self.next_id
         group = self.next_group
 
-        subjects = subjects.list()
-        l = len(subjects)
-        w = math.ceil(l/image_size)
+        # subjects = subjects.list()
+        # l = len(subjects)
+        # w = math.ceil(l/image_size)
 
-        for n in range(w):
-            a = n * image_size
-            b = min(l, a + image_size)
-            subset = subjects[a:b]
+        # for n in range(w):
+            # a = n * image_size
+            # b = min(l, a + image_size)
+            # subset = subjects[a:b]
 
-            images[i] = Image(i, group, subset, None)
+            # images[i] = Image(i, group, subset, None)
 
-            i += 1
-        self.next_id = i
+            # i += 1
+        image_group = ImageGroup.new(
+            group, self.next_id_callback(), subjects, cluster_assignments,
+            image_size=image_size, **kwargs)
+        # self.next_id = i
 
-        image_group = ImageGroup(group, images, image_size=image_size, **kwargs)
+        # image_group = ImageGroup(group, images, image_size=image_size, **kwargs)
         self._groups[group] = image_group
         self.save()
 
@@ -346,6 +413,13 @@ class HDFImages:
             f.attrs['next_group'] = 0
 
         return cls(fname)
+
+    def next_id_callback(self):
+        def callback():
+            i = self.next_id
+            self.next_id += 1
+            return i
+        return callback
 
     def get_group(self, group):
         if group not in self._groups:
