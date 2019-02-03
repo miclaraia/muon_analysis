@@ -141,6 +141,7 @@ class Storage:
             return file
 
     def get_subject(self, id):
+        id = str(id)
         subject = self._file['subjects'][id]
         return self._to_subject(id, subject)
 
