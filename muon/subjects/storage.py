@@ -72,13 +72,16 @@ class Storage:
         hdf = self._file
         if subject.id is None:
             subject.id = hdf.attrs['next_id']
-            print('new_id:', subject.id)
+            print(subject.id, type(subject.id))
+            #print('new_id:', subject.id)
             hdf.attrs['next_id'] = hdf.attrs['next_id'] + 1
         if str(subject.id) in hdf['subjects']:
             print('Skipping subject, already in file: {}'.format(subject))
             return [subject.id]
-        if subject.id > hdf.attrs['next_id']:
-            hdf.attrs['next_id'] = subject.id + 1
+
+        subject_id = int(subject.id)
+        if subject_id > hdf.attrs['next_id']:
+            hdf.attrs['next_id'] = subject_id + 1
 
         # print(subject.id, hdf.attrs['next_id'])
 

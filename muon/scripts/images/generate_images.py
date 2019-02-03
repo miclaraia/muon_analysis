@@ -15,8 +15,11 @@ def load_cluster_assignments(cluster_assignment_file):
 
 
 @click.group(invoke_without_command=True)
+@click.argument('image_file')
+@click.argument('subject_file')
+@click.argument('cluster_assignment_file')
 def main(image_file, subject_file, cluster_assignment_file):
-    hdf_images = HDFImages(image_file)
+    hdf_images = HDFImages.new(image_file)
     subject_storage = Storage(subject_file)
     cluster_assignments = load_cluster_assignments(cluster_assignment_file)
 
@@ -28,3 +31,5 @@ def main(image_file, subject_file, cluster_assignment_file):
     hdf_images.new_group(subject_storage, cluster_assignments, **kwargs)
     # generate(images, subjects, cluster_assignments)
 
+if __name__ == '__main__':
+    main()
