@@ -96,6 +96,7 @@ setup(
         'click',
         'dec-keras',
         'tqdm',
+        'sqlite3',
     ],
 
     # List additional groups of dependencies here (e.g. development
