@@ -97,6 +97,7 @@ setup(
         'dec-keras',
         'tqdm',
         'sqlite3',
+        'astropy',
     ],
 
     # List additional groups of dependencies here (e.g. development

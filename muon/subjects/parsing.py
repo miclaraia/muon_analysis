@@ -2,6 +2,7 @@ import re
 import os
 import h5py
 from tqdm import tqdm
+from astropy.io import fits
 
 from muon.subjects import Subject
 
@@ -156,4 +157,28 @@ class HDFParseQi:
 
                     id_ = cls.parse_event(run, event)
                     yield(id_, charge)
+
+
+class ParseFits:
+
+    @classmethod
+    def parse_row(cls, row):
+        charge = row['Charge']
+        label = int(row['IsMuon'])
+
+        metadata = {
+            'run': int(row['RunNum']),
+            'evt': int(row['EventNum']),
+            'tel': int(row['Telescop'])
+        }
+
+        return Subject(None, charge, metadata, label=label)
+    
+    @classmethod
+    def parse_file(cls, fname):
+        with fits.open(fname) as hdul:
+            data = hdul[1].data
+            for row in data:
+                yield cls.parse_row(row)
+    
 
