@@ -1,8 +1,4 @@
 import tqdm
-import h5py
-import json
-import os
-import csv
 from tqdm import tqdm
 
 from muon.subjects import Subject
@@ -12,161 +8,63 @@ from muon.subjects import Subjects
 
 class Storage:
 
-    def __init__(self, fname):
-        self.fname = fname
-        self._f = None
-        self._manifest = None
-
-    @property
-    def _file(self):
-        if self._f is None:
-            self._f = self.load()
-        return self._f
-
-    @property
-    def manifest(self):
-        if self._manifest is None:
-            fname = os.path.splitext(self.fname)[0] + '.json'
-            if not os.path.isfile(fname):
-                self._manifest = {'subjects': {}, 'next_id': 0}
-            else:
-                with open(fname, 'r') as file:
-                    self._manifest = json.load(file)
-
-        return self._manifest
-
-    def close(self):
-        if self._f:
-            self._f.close()
+    def __init__(self, database):
+        self.database = database
 
     def add_subjects(self, subjects):
+        with self.database.conn as conn:
+            self.database.Subject.add_subjects(conn, subjects)
+            conn.commit()
+
+    def add_labels(self, label_name, labels):
         skipped = []
-        for subject in tqdm(subjects):
-            skipped += self.add_subject(subject)
-        return skipped
+        database = self.database
 
-    def add_labels(self, name, labels):
-        skipped = []
-        hdf = self._file
-        for subject, label in tqdm(labels):
-            if subject in hdf['subjects']:
-                hdf_s = hdf['subjects'][subject]
-                s_labels = json.loads(hdf_s.attrs['label'])
-                if s_labels is None:
-                    s_labels = {}
-                s_labels[name] = label
-                hdf_s.attrs['label'] = json.dumps(s_labels)
-            else:
-                skipped.append(subject)
+        with database.conn as conn:
+            for subject, label in tqdm(labels):
+                database.Subject.add_subject_label(
+                    conn, subject, label_name, label)
 
-        all_labels = json.loads(hdf.attrs['labels'])
-        all_labels[name] = [s for s, l in labels]
-        hdf.attrs['labels'] = json.dumps(all_labels)
-
-        return skipped
+            conn.commit()
 
     def list_label_names(self):
-        return list(json.loads(self._file.attrs['labels']))
-    
+        with self.database.conn as conn:
+            return self.database.Subject.list_label_names(conn)
+
     def add_subject(self, subject):
-        hdf = self._file
-        if subject.id is None:
-            subject.id = hdf.attrs['next_id']
-            print(subject.id, type(subject.id))
-            #print('new_id:', subject.id)
-            hdf.attrs['next_id'] = hdf.attrs['next_id'] + 1
-        if str(subject.id) in hdf['subjects']:
-            print('Skipping subject, already in file: {}'.format(subject))
-            return [subject.id]
+        with self.database.conn as conn:
+            self.database.Subject.add_subject(conn, subject)
+            conn.commit()
 
-        subject_id = int(subject.id)
-        if subject_id > hdf.attrs['next_id']:
-            hdf.attrs['next_id'] = subject_id + 1
-
-        # print(subject.id, hdf.attrs['next_id'])
-
-        self._add_subject(subject)
-        return []
-
-    def _add_subject(self, subject):
-        hdf = self._file
-        
-        group = hdf.create_group('subjects/{}'.format(subject.id))
-
-        charge = subject.x
-        dset = group.create_dataset('charge', charge.shape, dtype='f')
-        dset[:] = charge
-
-        group.attrs['metadata'] = json.dumps(subject.metadata)
-        group.attrs['label'] = json.dumps(subject.y)
-
-
-    # def add_manifest(self, subject):
-        # manifest = self.manifest
-        # manifest['next_id'] = next_id + 1
-        # self.manifest['subjects'][subject] = {
-            # 'run': subject.metadata['run'],
-            # 'evt': subject.metadata['evt'],
-            # 'tel': subject.metadata['tel']}
-
-    # @staticmethod
-    # def _add_run(hdf_root, run):
-        # return hdf_root.create_group('runs/{}'.format(run))
-
-    # @staticmethod
-    # def _add_evt(hdf_run, evt):
-        # return hdf_run.create_group('evts/{}'.format(evt))
-
-    # def ensure_subject_path(self, hdf, subject):
-        # run = subject.metadata['run']
-        # evt = subject.metadata['evt']
-
-        # if run not in hdf['runs']:
-            # self._add_run(hdf, run)
-        # if evt not in hdf['runs'][run]['evts']:
-            # self._add_evt(hdf['runs'][run], evt)
-
-    @classmethod
-    def new(cls, fname):
-        pass
-
-    def load(self):
-        if os.path.isfile(self.fname):
-            return h5py.File(self.fname, 'r+')
-        else:
-            file = h5py.File(self.fname, 'w')
-            file.create_group('subjects')
-            file.attrs['next_id'] = 0
-            file.attrs['labels'] = json.dumps({})
-            return file
-
-    def get_subject(self, id):
-        id = str(id)
-        subject = self._file['subjects'][id]
-        return self._to_subject(id, subject)
+    def get_subject(self, subject_id):
+        with self.database.conn as conn:
+            return self.database.Subject.get_subject(conn, subject_id)
 
     def get_all_subjects(self):
-        return Subjects(
-            [self.get_subject(s) for s in tqdm(self._file['subjects'])])
+        with self.database.conn as conn:
+            subjects = [s for s in tqdm(
+                self.database.Subject.get_all_subjects(conn))]
+            return Subjects(subjects)
 
-    def get_subjects(self, subjects):
+    def get_subjects(self, subject_ids):
+        with self.database.conn as conn:
+            subjects = []
+            for subject_id in subject_ids:
+                subjects.append(
+                    self.database.Subject.get_subject(conn, subject_id))
+
+            return Subjects(subjects)
+
         subjects = [self.get_subject(s) for s in tqdm(subjects)]
         return Subjects(subjects)
 
-    def labeled_subjects(self, name):
-        return json.loads(self._file.attrs['labels'])[name]
+    def labeled_subjects(self, label_name):
+        with self.database.conn as conn:
+            return self.database.Subject.list_labeled_subjects(
+                conn, label_name)
 
     def iter(self):
-        hdf = self._file
-        for subject in tqdm(hdf['subjects']):
-            yield self._to_subject(subject, hdf['subjects'][subject])
+        with self.database.conn as conn:
+            for subject in tqdm(self.database.Subject.get_all_subjects(conn)):
+                yield subject
 
-    def to_subjects(self):
-        return Subjects(list(self.iter()))
-
-    def _to_subject(self, id, hdf_subject):
-        charge = hdf_subject['charge']
-        metadata = json.loads(hdf_subject.attrs['metadata'])
-        label = json.loads(hdf_subject.attrs['label'])
-
-        return Subject(id, charge, metadata, label)
