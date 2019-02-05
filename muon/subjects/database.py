@@ -2,6 +2,7 @@ import sqlite3
 import os
 import numpy as np
 import json
+from tqdm import tqdm
 
 from muon.subjects.subject import Subject
 
@@ -31,7 +32,6 @@ class Database:
 #                 subject_id, image_id, image_location details
 #             ImageGroups
 #                 group_id, metadata->(size, dim, group, description)
-            query = ''
             query = """
                 CREATE TABLE IF NOT EXISTS images (
                     image_id integer PIMARY KEY,
@@ -94,27 +94,35 @@ class Database:
         @classmethod
         def next_id(cls, conn):
             cursor = conn.execute('SELECT MAX(subject_id) FROM subjects')
-            return cursor.fetchone()[0] + 1
+            next_id = cursor.fetchone()[0]
+            if next_id:
+                return next_id + 1
+            return 0
 
         @classmethod
         def add_subject(cls, conn, subject):
             # subject_id, run, evt, tel, charge, cluster, label
-            subject.id = cls.next_id(conn)
             data = {
                 'subject_id': subject.id,
                 'run': subject.metadata['run'],
                 'evt': subject.metadata['evt'],
                 'tel': subject.metadata['tel'],
-                'charge': np.getbuffer(subject.x),
+                'charge': subject.x.tostring(),
             }
             keys, values = zip(*data.items())
 
-            conn.execute('INSERT INTO subjects ? VALUES ?', (keys, values))
+            query = 'INSERT INTO subjects ({}) VALUES ({})'.format(
+                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
+            conn.execute(query, values)
             return subject.id
 
         @classmethod
         def add_subjects(cls, conn, subjects):
-            for subject in subjects:
+            raise Exception
+            print(100)
+            print(subjects)
+            for subject in tqdm(subjects):
+                print(subject)
                 yield cls.add_subject(conn, subject)
 
         @classmethod
@@ -125,7 +133,9 @@ class Database:
                 'label': label
             }
             keys, values = zip(*data.items())
-            conn.execute('INSERT INTO subject_labels ? VALUES ?', (keys, values))
+            conn.execute(
+                'INSERT INTO subject_labels {} VALUES ?'.format(keys),
+                (values,))
 
         @classmethod
         def get_subject_label(cls, conn, subject_id, label_name):
@@ -161,7 +171,7 @@ class Database:
                     'evt': row[2],
                     'tel': row[3]
                 },
-                charge=row[4]
+                    charge=np.fromstring(row[4], dtype=np.float32)
             )
 
         @classmethod
@@ -176,7 +186,7 @@ class Database:
                         'evt': row[2],
                         'tel': row[3]
                     },
-                    charge=row[4]
+                    charge=np.fromstring(row[4], dtype=np.float32)
                 )
 
 
@@ -185,7 +195,10 @@ class Database:
         @classmethod
         def next_id(cls, conn):
             cursor = conn.execute('SELECT MAX(*) FROM images')
-            return cursor.fetchone()[0] + 1
+            next_id = cursor.fetchone()[0]
+            if next_id:
+                return next_id + 1
+            return 0
 
         @classmethod
         def add_image(cls, conn, image):
@@ -198,7 +211,8 @@ class Database:
                 'zoo_id': image.zoo_id
             }
             keys, values = zip(*data.items())
-            conn.execute('INSERT INTO images ? VALUEs ?', (keys, values))
+            conn.execute(
+                'INSERT INTO images {} VALUEs ?'.format(keys), (values,))
 
             return image.image_id
 
@@ -234,7 +248,10 @@ class Database:
         @classmethod
         def next_id(cls, conn):
             cursor = conn.execute('SELECT MAX(*) FROM groups')
-            return cursor.fetchone()[0] + 1
+            next_id = cursor.fetchone()[0]
+            if next_id:
+                return next_id + 1
+            return 0
 
         @classmethod
         def delete_group(cls, conn, group_id):
@@ -255,15 +272,17 @@ class Database:
                 'permutations': group.permutations
             }
             keys, values = zip(*data.items())
-            conn.execute('INSERT INTO images ? VALUEs ?', (keys, values))
+            conn.execute(
+                'INSERT INTO images {} VALUEs ?'.format(keys), (values,))
 
             return group.group_id
 
         @classmethod
         def get_group(cls, conn, group_id):
             cursor = conn.execute("""
-                SELECT group_id, image_size, image_width, description, permutations
-                FROM groups WHERE group_id=?""", (group_id,))
+                SELECT group_id, image_size, image_width,
+                description, permutations FROM groups WHERE group_id=?""",
+                (group_id,))
             group = cursor.fetchone()
 
             images = {image.id: image for image in \

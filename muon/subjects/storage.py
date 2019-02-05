@@ -13,7 +13,25 @@ class Storage:
 
     def add_subjects(self, subjects):
         with self.database.conn as conn:
-            self.database.Subject.add_subjects(conn, subjects)
+            next_id = self.database.Subject.next_id(conn)
+
+            for subject in tqdm(subjects):
+                subject.id = next_id
+                self.database.Subject.add_subject(conn, subject)
+
+                next_id += 1
+
+
+            # print(self.database.Subject.next_id(conn))
+            # print(dir(self.database.Subject))
+            # print(subjects, list(subjects))
+            # self.database.Subject.add_subjects(conn, subjects)
+            conn.commit()
+
+    def add_subject(self, subject):
+        with self.database.conn as conn:
+            subject.id = self.database.Subject.next_id(conn)
+            self.database.Subject.add_subject(conn, subject)
             conn.commit()
 
     def add_labels(self, label_name, labels):
@@ -30,11 +48,6 @@ class Storage:
     def list_label_names(self):
         with self.database.conn as conn:
             return self.database.Subject.list_label_names(conn)
-
-    def add_subject(self, subject):
-        with self.database.conn as conn:
-            self.database.Subject.add_subject(conn, subject)
-            conn.commit()
 
     def get_subject(self, subject_id):
         with self.database.conn as conn:
