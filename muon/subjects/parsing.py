@@ -150,7 +150,7 @@ class HDFParseQi:
                     if event == 'summary':
                         continue
                     try:
-                        charge = file[run][event]['charge']
+                        charge = file[run][event]['charge'][:-1]
                     except KeyError:
                         print(run, event)
                         raise

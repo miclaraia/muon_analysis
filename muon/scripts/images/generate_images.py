@@ -24,8 +24,8 @@ def main(image_file, subject_file, cluster_assignment_file):
     cluster_assignments = load_cluster_assignments(cluster_assignment_file)
 
     kwargs = {
-        'image_size': 9,
-        'image_width': 3,
+        'image_size': 36,
+        'image_width': 6,
         'permutations': 1
     }
     image_storage.new_group(subject_storage, cluster_assignments, **kwargs)
@@ -35,6 +35,9 @@ def main(image_file, subject_file, cluster_assignment_file):
     import sqlite3
     conn = sqlite3.connect(image_storage.fname)
     print(conn.execute('select * from groups').fetchall())
+
+    print('Press Enter to continue')
+    input()
 
     image_storage = SQLImages(image_file)
     print(image_storage.list_groups())

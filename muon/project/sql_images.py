@@ -22,9 +22,11 @@ class Image:
     A group of subjects which are uploaded to Panoptes as a single Image
     """
 
-    def __init__(self, image_id, group_id, subjects, metadata, zoo_id=None):
+    def __init__(self, image_id, group_id, 
+                 cluster, subjects, metadata, zoo_id=None):
         self.image_id = image_id
         self.group_id = group_id
+        self.cluster = cluster
         self.subjects = subjects
         self.metadata = metadata
         self.zoo_id = zoo_id
@@ -37,6 +39,7 @@ class Image:
         fields = [
             'image_id',
             'group_id',
+            'cluster',
             'metadata',
             'zoo_id']
         kwargs = {f: row[i] for i, f in enumerate(fields)}
@@ -53,9 +56,10 @@ class Image:
     def dump(self, conn):
         print('dumping', str(self))
         conn.execute(
-            'INSERT INTO images VALUES (?,?,?,?)', (
+            'INSERT INTO images VALUES (?,?,?,?,?)', (
                 self.image_id,
                 self.group_id,
+                self.cluster,
                 json.dumps(self.metadata),
                 self.zoo_id)
         )
@@ -70,8 +74,9 @@ class Image:
         conn.executemany('INSERT INTO subjects VALUES (?,?,?,?)', args)
 
     def __str__(self):
-        return 'id {} group {} subjects {} metadata {} zooid {}'.format(
-            self.image_id, self.group_id, len(self.subjects),
+        return 'id {} group {} cluster {} subjects {} ' \
+               'metadata {} zooid {}'.format(
+            self.image_id, self.group_id, self.cluster, len(self.subjects),
             str(self.metadata), self.zoo_id)
 
     def __repr__(self):
@@ -287,17 +292,18 @@ class ImageGroup:
             cluster_assignments: {cluster: [subject_id]}
         """
         for c in cluster_assignments:
-            meta = {'cluster': c}
+            meta = {}
             cluster_subjects = subject_storage.get_subjects(cluster_assignments[c])
-            self.add_subjects(next_id, cluster_subjects, meta)
+            self.add_subjects(next_id, c, cluster_subjects, meta)
 
-    def add_subjects(self, next_id, subjects, meta):
+    def add_subjects(self, next_id, cluster, subjects, meta):
         for image_subjects in self.split_subjects(subjects):
             id_ = next_id()
             if id_ in self.images:
                 raise KeyError('image id {} already exists in group {}' \
                     .format(id_, self.group_id))
-            self.images[id_] = Image(id_, self.group_id, image_subjects, meta)
+            self.images[id_] = Image(
+                id_, self.group_id, cluster, image_subjects, meta)
 
     def metadata(self):
         return {
@@ -444,6 +450,7 @@ class SQLImages:
                 CREATE TABLE IF NOT EXISTS images (
                     image_id integer PIMARY KEY,
                     group_id integer,
+                    cluster integer,
                     metadata text NOT NULL,
                     zoo_id integer
                 );

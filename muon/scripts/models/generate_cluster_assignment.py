@@ -23,19 +23,18 @@ def main(model_save_dir, subject_storage, output):
     elif 'supervised' not in model_save_dir:
         Model = DECv2
 
-    config = Config.load(model_save_dir+'/config.json')
-    with open(config.splits_file, 'rb') as file:
-        splits = pickle.load(file)
-    dec = Model.load(model_save_dir, splits['train'][0])
-
     subject_storage = Storage(subject_storage)
     subjects = subject_storage.get_all_subjects()
     subject_ids = subjects.keys()
     x = subjects.get_x(subject_ids)
+    print(x.shape)
+
+    dec = Model.load(model_save_dir, x)
 
     cluster_pred = zip(subject_ids, dec.predict_clusters(x))
     cluster_assignments = {}
     for subject_id, cluster in cluster_pred:
+        cluster = int(cluster)
         if cluster not in cluster_assignments:
             cluster_assignments[cluster] = []
         cluster_assignments[cluster].append(subject_id)
@@ -46,4 +45,5 @@ def main(model_save_dir, subject_storage, output):
         pickle.dump(cluster_assignments, f)
 
     
-
+if __name__ == '__main__':
+    main()

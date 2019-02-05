@@ -146,7 +146,8 @@ class Storage:
         return self._to_subject(id, subject)
 
     def get_all_subjects(self):
-        return Subjects([self.get_subject(s) for s in self._file['subjects']])
+        return Subjects(
+            [self.get_subject(s) for s in tqdm(self._file['subjects'])])
 
     def get_subjects(self, subjects):
         subjects = [self.get_subject(s) for s in tqdm(subjects)]
@@ -164,7 +165,7 @@ class Storage:
         return Subjects(list(self.iter()))
 
     def _to_subject(self, id, hdf_subject):
-        charge = hdf_subject['charge'][:-1]
+        charge = hdf_subject['charge']
         metadata = json.loads(hdf_subject.attrs['metadata'])
         label = json.loads(hdf_subject.attrs['label'])
 
