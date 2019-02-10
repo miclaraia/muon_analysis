@@ -157,10 +157,10 @@ class Subjects:
 
         return x, y
 
-    def get_x(self, subjects):
+    def get_x(self):
         x = np.zeros(self.get_dimensions())
-        for i, subject in enumerate(subjects):
-            x[i,:] = self.get_subject(subject).x
+        for i, subject in enumerate(self.iter()):
+            x[i,:] = subject.x
         return x
 
     ##########################################################################

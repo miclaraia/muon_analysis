@@ -66,6 +66,13 @@ class Database:
                     label integer
                 );
 
+                CREATE TABLE IF NOT EXISTS clustering (
+                    subject_id integer PRIMARY KEY,
+                    cluster integer,
+                    is_test boolean DEFAULT 0,
+                    split integer
+                )
+
                 CREATE TABLE IF NOT EXISTS subject_labels (
                     subject_id integer,
                     label_name text,
@@ -114,6 +121,10 @@ class Database:
             query = 'INSERT INTO subjects ({}) VALUES ({})'.format(
                     ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
             conn.execute(query, values)
+
+            conn.execute(
+                'INSERT INTO clustering (subject_id) VALUES ?',
+                subject.id)
             return subject.id
 
         @classmethod
@@ -158,6 +169,13 @@ class Database:
             return [row[0] for row in cursor]
 
         @classmethod
+        def list_subjects(self, conn):
+            cursor = conn.execute(
+                'SELECT subject_id FROM subject_labels',
+                label_name)
+            return [row[0] for row in cursor]
+
+        @classmethod
         def get_subject(cls, conn, subject_id):
             cursor = conn.execute("""
                 SELECT subject_id, run, evt, tel, charge FROM subjects
@@ -189,6 +207,29 @@ class Database:
                     charge=np.fromstring(row[4], dtype=np.float32)
                 )
 
+    class Clustering:
+
+        @classmethod
+        def set_subject_test_flag(cls, conn, subject_id, is_test_set):
+            cursor = conn.execute("""
+                UPDATE clustering SET test_set=?
+                WHERE subject_id=?""", (is_test_set, subject_id)
+            )
+
+        @classmethod
+        def set_subject_cluster(cls, conn, subject_id, cluster):
+            conn.execute("""
+                UPDATE clustering SET cluster=?
+                WHERE subject_id=?""", (subject_id, int(cluster)))
+
+        @classmethod
+        def get_subjects(cls, conn, is_test=False):
+            cursor = conn.execute(
+                'SELECT subject_id FROM clustering WHERE is_test=?',
+                int(is_test))
+
+            for row in cursor:
+                yield row[0]
 
     class Image:
 
