@@ -1,7 +1,9 @@
-
+import random
+import numpy as np
+import os
+from tqdm import tqdm
 
 from redec_keras.models.decv2 import DECv2, Config
-import random
 
 SPLITS = {k: i for i, k in enumerate(['train', 'test', 'valid', 'train_dev'])}
 
@@ -9,14 +11,26 @@ SPLITS = {k: i for i, k in enumerate(['train', 'test', 'valid', 'train_dev'])}
 class Clustering:
 
     @classmethod
-    def reserve_test_set(cls, subject_storage):
+    def reserve_test_set(cls, subject_storage, fraction=0.25):
+        # TODO need to make sure previous assignments are preserved
+        # or version the test set assignments somehow
         database = subject_storage.database
-        subject_ids = database.Subject.list_labeled_subjects()
 
         with subject_storage.database.conn as conn:
-            for subject_id in subject_ids:
+            test_set = list(database.Clustering \
+                    .get_subjects(conn, is_test=True))
+            train_set = list(database.Clustering \
+                    .get_subjects(conn, is_test=False))
+
+            n_add = int(0.25*(len(test_set)+len(train_set)) - len(test_set))
+            assert n_add >= 0
+
+            np.random.shuffle(train_set)
+            to_add = train_set[:n_add]
+
+            for subject_id in to_add:
                 database.Clustering.set_subject_test_flag(
-                    conn, subject_id, (random.random() < 0.25))
+                    conn, subject_id, True)
 
             conn.commit()
 
@@ -31,24 +45,34 @@ class Clustering:
         dec = DECv2(config, x.shape)
         dec.init(x)
 
-        y_pred = dec.clustering(
+        no_shape = (0, x.shape[1])
+        dec.clustering(
             (x, None),
-            (None, None),
-            (None, None))
+            (np.zeros(no_shape), None),
+            (np.zeros(no_shape), None))
+
+    @classmethod
+    def train_multitask(cls, config, subject_storage):
+        pass
+
+    @classmethod
+    def train_redec(cls, config, subject_storage):
+        pass
 
     @classmethod
     def assign_clusters(cls, config, subject_storage):
         database = subject_storage.database
 
         models = {
-            'dec': DECv2,
+            'decv2': DECv2,
             'multitask': None,
             'redec': None
         }
         subjects = subject_storage.get_all_subjects()
+        subject_ids = subjects.keys()
         x = subjects.get_x()
 
-        dec = models[config.type].load(config.save_dir, (None, 499))
+        dec = models[config.type].load(config.save_dir, np.zeros((0, 499)))
         cluster_pred = zip(subject_ids, dec.predict_clusters(x))
 
         with database.conn as conn:
@@ -56,5 +80,18 @@ class Clustering:
                 database.Clustering.set_subject_cluster(conn, subject_id, cluster)
             conn.commit()
 
+    @classmethod
+    def assess_clusters(cls, subject_storage):
+        database = subject_storage.database
 
-        #dec.report_run(splits)
+        with database.conn as conn:
+            cluster_assignments = database.Clustering.get_cluster_assignments(conn)
+            for cluster in cluster_assignments:
+                labels = []
+                for subject in tqdm(cluster_assignments[cluster]):
+                    labels.append(database.Subject \
+                        .get_subject_label(conn, subject, 'vegas'))
+
+                yield (cluster, labels)
+
+

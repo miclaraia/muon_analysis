@@ -5,6 +5,7 @@ import json
 from tqdm import tqdm
 
 from muon.subjects.subject import Subject
+from muon.subjects.images import Image, ImageGroup
 
 
 
@@ -71,7 +72,7 @@ class Database:
                     cluster integer,
                     is_test boolean DEFAULT 0,
                     split integer
-                )
+                );
 
                 CREATE TABLE IF NOT EXISTS subject_labels (
                     subject_id integer,
@@ -123,8 +124,8 @@ class Database:
             conn.execute(query, values)
 
             conn.execute(
-                'INSERT INTO clustering (subject_id) VALUES ?',
-                subject.id)
+                'INSERT INTO clustering (subject_id) VALUES (?)',
+                (subject.id,))
             return subject.id
 
         @classmethod
@@ -144,9 +145,10 @@ class Database:
                 'label': label
             }
             keys, values = zip(*data.items())
-            conn.execute(
-                'INSERT INTO subject_labels {} VALUES ?'.format(keys),
-                (values,))
+
+            query = 'INSERT INTO subject_labels ({}) VALUES ({})'.format(
+                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
+            conn.execute(query, values)
 
         @classmethod
         def get_subject_label(cls, conn, subject_id, label_name):
@@ -212,7 +214,7 @@ class Database:
         @classmethod
         def set_subject_test_flag(cls, conn, subject_id, is_test_set):
             cursor = conn.execute("""
-                UPDATE clustering SET test_set=?
+                UPDATE clustering SET is_test=?
                 WHERE subject_id=?""", (is_test_set, subject_id)
             )
 
@@ -220,13 +222,23 @@ class Database:
         def set_subject_cluster(cls, conn, subject_id, cluster):
             conn.execute("""
                 UPDATE clustering SET cluster=?
-                WHERE subject_id=?""", (subject_id, int(cluster)))
+                WHERE subject_id=?""", (int(cluster), subject_id))
+
+        @classmethod
+        def get_cluster_assignments(cls, conn):
+            cursor = conn.execute('SELECT subject_id, cluster FROM clustering')
+            clusters = {}
+            for subject_id, cluster in tqdm(cursor):
+                if cluster not in clusters:
+                    clusters[cluster] = []
+                clusters[cluster].append(subject_id)
+            return clusters
 
         @classmethod
         def get_subjects(cls, conn, is_test=False):
             cursor = conn.execute(
                 'SELECT subject_id FROM clustering WHERE is_test=?',
-                int(is_test))
+                (int(is_test),))
 
             for row in cursor:
                 yield row[0]
@@ -235,7 +247,7 @@ class Database:
 
         @classmethod
         def next_id(cls, conn):
-            cursor = conn.execute('SELECT MAX(*) FROM images')
+            cursor = conn.execute('SELECT MAX(image_id) FROM images')
             next_id = cursor.fetchone()[0]
             if next_id:
                 return next_id + 1
@@ -243,7 +255,6 @@ class Database:
 
         @classmethod
         def add_image(cls, conn, image):
-            image.image_id = cls.next_id(conn)
             data = {
                 'image_id': image.image_id,
                 'group_id': image.group_id,
@@ -252,8 +263,17 @@ class Database:
                 'zoo_id': image.zoo_id
             }
             keys, values = zip(*data.items())
-            conn.execute(
-                'INSERT INTO images {} VALUEs ?'.format(keys), (values,))
+
+            query = 'INSERT INTO images ({}) VALUES ({})'.format(
+                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
+            conn.execute(query, values)
+
+            for i, subject_id in enumerate(image.subjects):
+                conn.execute("""
+                    INSERT INTO image_subjects
+                    (subject_id, image_id, group_id, image_index)
+                    VALUES (?,?,?,?)""",
+                    (subject_id, image.image_id, image.group_id, i))
 
             return image.image_id
 
@@ -285,10 +305,11 @@ class Database:
                 yield cls.get_image(conn, row[0])
 
     class ImageGroup:
+        # TODO add update methods
 
         @classmethod
         def next_id(cls, conn):
-            cursor = conn.execute('SELECT MAX(*) FROM groups')
+            cursor = conn.execute('SELECT MAX(group_id) FROM groups')
             next_id = cursor.fetchone()[0]
             if next_id:
                 return next_id + 1
@@ -304,7 +325,6 @@ class Database:
         @classmethod
         def add_group(cls, conn, group):
 
-            group.group_id = cls.next_id(conn)
             data = {
                 'group_id': group.group_id,
                 'image_size': group.image_size,
@@ -313,10 +333,17 @@ class Database:
                 'permutations': group.permutations
             }
             keys, values = zip(*data.items())
-            conn.execute(
-                'INSERT INTO images {} VALUEs ?'.format(keys), (values,))
+
+            query = 'INSERT INTO groups ({}) VALUES ({})'.format(
+                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
+            conn.execute(query, values)
 
             return group.group_id
+
+        @classmethod
+        def list_groups(cls, conn):
+            cursor = conn.execute('SELECT group_id FROM groups')
+            return [row[0] for row in cursor]
 
         @classmethod
         def get_group(cls, conn, group_id):
@@ -326,16 +353,13 @@ class Database:
                 (group_id,))
             group = cursor.fetchone()
 
-            images = {image.id: image for image in \
-                Database.Image.get_group_images(conn, group_id)}
-
             return ImageGroup(
                 group_id=group[0],
                 image_size=group[1],
                 image_width=group[2],
                 description=group[3],
                 permutations=group[4],
-                images=images)
+                images=None)
 
 
 

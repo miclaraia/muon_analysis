@@ -5,6 +5,7 @@ import random
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 import logging
+from tqdm import tqdm
 
 import muon.project.panoptes as panoptes
 import muon.config
@@ -159,16 +160,17 @@ class ImageGroup:
         self.zoo_map = None
 
     @classmethod
-    def new(cls, group, next_id,
+    def new(cls, group_id, next_id,
             subject_storage, cluster_assignments, **kwargs):
         """
         Parameters:
             next_id: callback function to get next image id
             cluster_assignments: {cluster: [subject_id]}
         """
-        self = cls(group, None, **kwargs)
-        self.add_clustered_subjects(
-            next_id, subject_storage, cluster_assignments)
+        self = cls(group_id, None, **kwargs)
+        images = self.create_images(
+            group_id, next_id, subject_storage, cluster_assignments)
+        self.images = images
         return self
 
         # images = {}
@@ -185,27 +187,41 @@ class ImageGroup:
         # self.images = images
         # return i, self
 
-    def add_clustered_subjects(
-            self, next_id, subject_storage, cluster_assignments):
+    def create_images(
+            self, group_id, next_id, subject_storage, cluster_assignments):
         """
         Parameters:
             next_id: next id for a new image
             subjects
             cluster_assignments: {cluster: [subject_id]}
         """
-        for c in cluster_assignments:
+        images = {}
+        for cluster in cluster_assignments:
             meta = {}
-            cluster_subjects = subject_storage.get_subjects(cluster_assignments[c])
-            self.add_subjects(next_id, c, cluster_subjects, meta)
+            cluster_subjects = subject_storage.get_subjects(
+                cluster_assignments[cluster])
+            print(cluster, cluster_subjects)
+            # self.add_subjects(cluster, cluster_subjects, meta)
+            
+            for image_subjects in self.split_subjects(cluster_subjects):
+                image_id = next_id()
+                images[image_id] = Image(
+                    image_id=image_id,
+                    group_id=group_id,
+                    cluster=cluster,
+                    subjects=image_subjects,
+                    metadata=meta)
+        return images
 
-    def add_subjects(self, next_id, cluster, subjects, meta):
-        for image_subjects in self.split_subjects(subjects):
-            id_ = next_id()
-            if id_ in self.images:
-                raise KeyError('image id {} already exists in group {}' \
-                    .format(id_, self.group_id))
-            self.images[id_] = Image(
-                id_, self.group_id, cluster, image_subjects, meta)
+
+    # def create_subjects(self, cluster, subjects, meta):
+        # for image_subjects in self.split_subjects(subjects):
+            # id_ = next_id()
+            # if id_ in self.images:
+                # raise KeyError('image id {} already exists in group {}' \
+                    # .format(id_, self.group_id))
+            # self.images[id_] = Image(
+                # id_, self.group_id, cluster, image_subjects, meta)
 
     def metadata(self):
         return {
@@ -274,10 +290,10 @@ class ImageGroup:
                 images.append(subset)
         return images
 
-    def remove_images(self, images):
-        for image in self.iter():
-            if image.id in images:
-                image.metadata['deleted'] = True
+    # def remove_images(self, images):
+        # for image in self.iter():
+            # if image.id in images:
+                # image.metadata['deleted'] = True
 
     def upload_subjects(self, path):
         """
@@ -321,61 +337,34 @@ class ImageGroup:
             image.plot(self.image_width, subject_storage, path)
 
 
-class SQLImages:
+class ImageStorage:
 
-    def __init__(self, fname):
-        self.fname = fname
-        self.next_id = 0
-        self.next_group = 0
+    def __init__(self, database):
+        self.database = database
         self._groups = {}
-
-        if not os.path.isfile(fname):
-            self.create_db()
 
     @property
     def conn(self):
-        return self.__class__.Connection(self.fname)
-        # return sqlite3.connect(self.fname)
+        return self.database.conn
 
-    def create_db(self):
+    def next_group(self):
         with self.conn as conn:
+            return self.database.ImageGroup.next_id(conn)
 
-#         Tables:
-#             Images
-#                 image_id, group_id, metadata, zoo_id
-#             ImageSubjects
-#                 subject_id, image_id, image_location details
-#             ImageGroups
-#                 group_id, metadata->(size, dim, group, description)
-            query = ''
-            query = """
-                CREATE TABLE IF NOT EXISTS images (
-                    image_id integer PIMARY KEY,
-                    group_id integer,
-                    cluster integer,
-                    metadata text NOT NULL,
-                    zoo_id integer
-                );
+    def next_id(self):
+        with self.conn as conn:
+            return self.database.Image.next_id(conn)
 
-                CREATE TABLE IF NOT EXISTS subjects (
-                    subject_id integer,
-                    image_id integer,
-                    group_id integer,
-                    image_index integer
-                );
+    def next_id_callback(self):
+        next_id = self.next_id()
+        def f():
+            nonlocal next_id
+            i = next_id
+            next_id += 1
+            return i
+        return f
 
-                CREATE TABLE IF NOT EXISTS groups (
-                    group_id integer PRIMARY KEY,
-                    image_size integer,
-                    image_width integer,
-                    description text,
-                    permutations integer
-                );
-            """
-            print(query)
-            conn.executescript(query)
-
-    def new_group(self, subjects, cluster_assignments, image_size, **kwargs):
+    def new_group(self, subjects, image_size, **kwargs):
         """
         Generate a file detailing which subjects belong in which image
         and their location in the image.
@@ -383,7 +372,6 @@ class SQLImages:
         """
         # images = {}
         # i = self.next_id
-        group = int(self.next_group)
 
         # subjects = subjects.list()
         # l = len(subjects)
@@ -397,14 +385,23 @@ class SQLImages:
             # images[i] = Image(i, group, subset, None)
 
             # i += 1
-        image_group = ImageGroup.new(
-            group, self.next_id_callback(), subjects, cluster_assignments,
-            image_size=image_size, **kwargs)
-        # self.next_id = i
+        group_id = self.next_group()
+        next_id = self.next_id_callback()
 
-        # image_group = ImageGroup(group, images, image_size=image_size, **kwargs)
-        self._groups[group] = image_group
-        self.save()
+        with self.conn as conn:
+            cluster_assignments = self.database.Clustering \
+                .get_cluster_assignments(conn)
+        group = ImageGroup.new(
+            group_id, next_id, subjects, cluster_assignments,
+            image_size=image_size, **kwargs)
+
+        with self.conn as conn:
+            self.database.ImageGroup.add_group(conn, group)
+            for image in group.iter():
+                self.database.Image.add_image(conn, image)
+
+            conn.commit()
+        self._groups[group] = group
 
     # @classmethod
     # def new(cls, fname):
@@ -414,44 +411,33 @@ class SQLImages:
 
     #     return cls(fname)
 
-    def next_id_callback(self):
-        def callback():
-            i = self.next_id
-            self.next_id += 1
-            return i
-        return callback
-
     def get_group(self, group):
         if group not in self._groups:
             self._groups[group] = self.load_group(group)
         return self._groups[group]
 
-    def load_metadata(self):
+    def load_group(self, group_id):
         with self.conn as conn:
-            cursor = conn.execute('SELECT MAX(image_id) FROM images')
-            #try:
-            self.next_id = cursor.fetchone[0] + 1
-            #except
+            group = self.database.ImageGroup.get_group(conn, group_id)
+            images = self.database.Image.get_group_images(conn, group_id)
 
-            cursor = conn.execute('SELECT MAX(group_id) FROM groups')
-            self.next_group = cursor.fetchone()[0] + 1
-
-    def load_group(self, group):
-        with self.conn as conn:
-            return ImageGroup.load(conn, group)
+            images = {image.image_id: image for image in tqdm(images)}
+            group.images = images
+            return group
 
     def list_groups(self):
         with self.conn as conn:
-            cursor = conn.execute('SELECT group_id FROM groups')
-            return [row[0] for row in cursor]
+            self.database.ImageGroup.list_groups(conn)
 
     def save(self, groups=None):
-        with self.conn as conn:
-            groups = groups or list(self._groups)
-            print(groups)
-            for group in groups:
-                self._groups[group].dump(conn)
-            conn.commit()
+        # TODO somehow manage upating the database
+        pass
+        # with self.conn as conn:
+            # groups = groups or list(self._groups)
+            # print(groups)
+            # for group in groups:
+                # self._groups[group].dump(conn)
+            # conn.commit()
 
 #         with h5py.File(self.fname, 'r+') as f:
 #             f.attrs['next_id'] = self.next_id
@@ -464,17 +450,3 @@ class SQLImages:
 #                 if g in f:
 #                     del f[g]
 #                 self._groups[group].dump_hdf(f.create_group(g))
-
-    class Connection:
-
-        def __init__(self, fname):
-            self.fname = fname
-            self.conn = None
-
-        def __enter__(self):
-            self.conn = sqlite3.connect(self.fname)
-            return self.conn
-
-        def __exit__(self, type, value, traceback):
-            self.conn.close()
-
