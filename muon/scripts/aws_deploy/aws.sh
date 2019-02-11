@@ -6,7 +6,7 @@ THIS="$(readlink -f ${BASH_SOURCE[0]})"
 
 get_host() {
     if [[ "$1" == "gpu" ]]; then
-        HOST="ec2-3-16-11-25.us-east-2.compute.amazonaws.com"
+        HOST="ec2-18-216-205-18.us-east-2.compute.amazonaws.com"
         TYPE="ubuntu"
     elif [[ "$1" == "setup" ]]; then
         HOST="ec2-18-188-95-229.us-east-2.compute.amazonaws.com"
@@ -25,7 +25,6 @@ get_device() {
         DEVICE="bb991a07-6876-4d88-9718-9cd930b5b011"
     fi
 }
-
 
 POS=()
 while [[ $# -gt 0 ]]; do
@@ -96,6 +95,8 @@ EOF
     upload_data)
         cd $MUON
         $MUON/run upload
+        #${HERE}/upload_data.sh \
+            #-h ${HOST} -t ${TYPE} --device ${DEVICE}
         ssh zoo << EOF
             source \$HOME/.profile
             \${MUON}/muon/scripts/aws_deploy/upload_data.sh \

@@ -61,6 +61,7 @@ EOF
 
 rsync -rcPv -e "$SSH_PRE" \
     --files-from=/tmp/upload_aws_muon_files.txt \
+    --exclude 'clustering_models/' \
     --exclude 'clustering_models/aws' \
     --exclude 'clustering_models/run*' \
     --exclude 'clustering_models/hugh' \

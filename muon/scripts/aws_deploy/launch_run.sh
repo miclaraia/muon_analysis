@@ -21,6 +21,10 @@ while [[ $# -gt 0 ]]; do
             INSTANCE_TYPE="$2"
             shift 2
             ;;
+        --script)
+            SCRIPT="$2"
+            shift 2
+            ;;
         *)
             POSITIONAL+=("$1")
             shift
@@ -28,9 +32,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 set -- "${POSITIONAL[@]}"
-
-MODEL=$1
-shift
 
 cd ${HERE}
 SSH="$(${HERE}/ssh.sh -h ${HOST} --type ${INSTANCE_TYPE} -p)"
@@ -40,7 +41,16 @@ RAND=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
 set -o pipefail
 fname=/tmp/launch_aws_muon_${RAND}
 
-MODEL_FILE="\${MUON}/muon/scripts/models/${MODEL}"
+if [ ! -z ${SCRIPT:-} ]; then
+
+    MODEL_FILE="\${MUON}/$(python -c "import os.path; print(os.path.relpath(os.path.abspath('${SCRIPT}'), '${MUON}'))")"
+    MODEL="script"
+else
+    MODEL_FILE="\${MUON}/muon/scripts/models/${MODEL}"
+    MODEL=$1
+    shift
+    MODEL=$(python -c "print('${MODEL}'.replace('/','_'))")
+fi
 cat > ${fname} << EOF
 #!/bin/bash
 set -euxvo pipefail
@@ -65,7 +75,6 @@ cat > ${fname}.screen << EOF
 zombie kr
 verbose on
 EOF
-MODEL=$(python -c "print('${MODEL}'.replace('/','_'))")
 
 SSH_PRE="$(python3 -c "print(' '.join('${SSH}'.split(' ')[:-1]))")"
 HOST="$(python3 -c "print('${SSH}'.split(' ')[-1])")"

@@ -45,14 +45,22 @@ SSH_PRE="$(python3 -c "print(' '.join('${SSH}'.split(' ')[:-1]))")"
 HOST="$(python3 -c "print('${SSH}'.split(' ')[-1])")"
 
 rsync -rPv -e "$SSH_PRE" --files-from=$file $HOST:/mnt/muon/data/clustering_models/ $MUOND/clustering_models/aws
-rm $file
 
-for file in $(find ${MUOND}/clustering_models/aws -name config.json); do
-    if [ ! -z "$(grep "/mnt/muon/data" $file)" ]; then
-        sed -i "s,/mnt/muon/data,${MUOND},g" $file
-        sed -i "s,clustering_models,clustering_models/aws,g" $file
+for dir in $(cat ${file}); do
+    config="${MUOND}/clustering_models/aws/$dir/config.json"
+    if [ ! -z "$(grep "/mnt/muon/data" $config)" ]; then
+        sed -i "s,/mnt/muon/data,${MUOND},g" $config
+        sed -i "s,clustering_models,clustering_models/aws,g" $config
     fi
 done
+
+#for file in $(find ${MUOND}/clustering_models/aws -name config.json); do
+    #if [ ! -z "$(grep "/mnt/muon/data" $file)" ]; then
+        #sed -i "s,/mnt/muon/data,${MUOND},g" $file
+        #sed -i "s,clustering_models,clustering_models/aws,g" $file
+    #fi
+#done
+rm $file
 
 
 #cat > /tmp/upload_aws_muon_files.txt << EOF

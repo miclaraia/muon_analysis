@@ -53,6 +53,14 @@ rsync -rpv -e "$SSH_PRE" \
     --exclude="*.csv" \
     --exclude="*.json" \
     ${MUON}/muon ${HOST}:\${HOME}/muon
+rsync -rpv -e "$SSH_PRE" \
+    --exclude="__pycache__" \
+    --exclude="*.pkl" \
+    --exclude="*.csv" \
+    --exclude="*.json" \
+    --exclude=".git" \
+    ${ZOO}/redec-keras ${HOST}:\${HOME}
+
 rsync -e "$SSH_PRE" ${MUON}/setup.py ${HOST}:\${HOME}/muon
 rsync -e "$SSH_PRE" ${MUON}/VERSION ${HOST}:\${HOME}/muon
 
@@ -123,6 +131,7 @@ EOF2
     #pip uninstall -y tensorflow tensorflow-cpu
     #pip install tensorflow-gpu
     pip install -e \${MUON}
+    pip install -e \${REDEC}
 
     python -c "import tensorflow as tf; sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))"
 fi
