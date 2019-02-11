@@ -33,7 +33,7 @@ def main(name, save_dir, database_file):
         'source_dir': None,
         'splits_file': None,
         'n_classes': 2,
-        'n_clusters': 10,
+        'n_clusters': 50,
         'source_weights': (None, None),
     }
 
