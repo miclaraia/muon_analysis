@@ -90,13 +90,11 @@ setup(
         'scipy',
         'panoptes_client',
         'scikit-image',
-        'keras',
         'pandas',
         'progressbar2',
         'click',
         'dec-keras',
         'tqdm',
-        'sqlite3',
         'astropy',
     ],
 
