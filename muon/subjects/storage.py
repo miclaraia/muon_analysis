@@ -71,6 +71,12 @@ class Storage:
         subjects = [self.get_subject(s) for s in tqdm(subjects)]
         return Subjects(subjects)
 
+    def get_cluster_subjects(self, cluster):
+        with self.database.conn as conn:
+            subjects = self.database.Clustering. \
+                get_cluster_subjects(conn, cluster)
+            return self.get_subjects(subjects)
+
     def labeled_subjects(self, label_name):
         with self.database.conn as conn:
             return self.database.Subject.list_labeled_subjects(

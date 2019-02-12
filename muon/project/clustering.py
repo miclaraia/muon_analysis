@@ -81,17 +81,18 @@ class Clustering:
             conn.commit()
 
     @classmethod
-    def assess_clusters(cls, subject_storage):
+    def cluster_assignment_counts(cls, subject_storage, label_name):
         database = subject_storage.database
 
         with database.conn as conn:
-            cluster_assignments = database.Clustering.get_cluster_assignments(conn)
-            for cluster in cluster_assignments:
-                labels = []
-                for subject in tqdm(cluster_assignments[cluster]):
-                    labels.append(database.Subject \
-                        .get_subject_label(conn, subject, 'vegas'))
+            clusters = {}
+            for cluster, _, label in tqdm(
+                    database.Clustering.get_cluster_labels(conn, label_name)):
 
-                yield (cluster, labels)
+                if cluster not in clusters:
+                    clusters[cluster] = np.zeros((2,))
+                clusters[cluster][label] += 1
 
+            clusters = np.array([clusters[c] for c in sorted(clusters)])
 
+            return clusters

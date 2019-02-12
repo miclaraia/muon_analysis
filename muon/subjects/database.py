@@ -79,6 +79,12 @@ class Database:
                     label_name text,
                     label integer
                 );
+
+                CREATE INDEX subject_label_names 
+                ON subject_labels (subject_id, label_name);
+
+                CREATE INDEX clusters
+                ON clustering (cluster)
             """
             print(query)
             conn.executescript(query)
@@ -233,6 +239,29 @@ class Database:
                     clusters[cluster] = []
                 clusters[cluster].append(subject_id)
             return clusters
+
+        @classmethod
+        def get_cluster_labels(cls, conn, label_name):
+            cursor = conn.execute("""
+                SELECT clustering.cluster, 
+                    clustering.subject_id, subject_labels.label
+                    FROM clustering
+                INNER JOIN subject_labels
+                    ON clustering.subject_id=subject_labels.subject_id
+                WHERE subject_labels.label_name=?
+                ORDER BY clustering.cluster ASC""",
+                (label_name,))
+            
+            for row in cursor:
+                yield row
+
+        @classmethod
+        def get_cluster_subjects(cls, conn, cluster):
+            cursor = conn.execute(
+                'SELECT subject_id FROM clustering WHERE cluster=?',
+                (cluster,))
+            for row in cursor:
+                yield row[0]
 
         @classmethod
         def get_subjects(cls, conn, is_test=False):
