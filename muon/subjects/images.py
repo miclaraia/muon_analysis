@@ -250,11 +250,11 @@ class ImageGroup:
         return self.images[self.zoo_map[zoo_id]]
 
     def iter(self):
-        for image in self.list():
-            yield image
+        for image_id in sorted(self.images):
+            yield self.images[image_id]
 
     def list(self):
-        return list(self.images.values())
+        return list(self.iter())
 
     def split_subjects(self, subjects):
         """
@@ -307,8 +307,8 @@ class ImageGroup:
         for image in self.iter():
             # Skip images that are already uploaded and linked to the
             # subject set, and make sure the zoo_id map is correct
-            if image.id in existing_subjects:
-                image.zoo_id = existing_subjects[image.id]
+            if image.image_id in existing_subjects:
+                image.zoo_id = existing_subjects[image.image_id]
                 print('Skipping %s' % image)
                 continue
 
@@ -395,13 +395,8 @@ class ImageStorage:
             group_id, next_id, subjects, cluster_assignments,
             image_size=image_size, **kwargs)
 
-        with self.conn as conn:
-            self.database.ImageGroup.add_group(conn, group)
-            for image in group.iter():
-                self.database.Image.add_image(conn, image)
-
-            conn.commit()
-        self._groups[group] = group
+        self.add_group(group)
+        return group
 
     # @classmethod
     # def new(cls, fname):
@@ -410,6 +405,15 @@ class ImageStorage:
     #         f.attrs['next_group'] = 0
 
     #     return cls(fname)
+
+    def add_group(self, group):
+        with self.conn as conn:
+            self.database.ImageGroup.add_group(conn, group)
+            for image in group.iter():
+                self.database.Image.add_image(conn, image)
+
+            conn.commit()
+        self._groups[group] = group
 
     def get_group(self, group):
         if group not in self._groups:

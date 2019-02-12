@@ -85,6 +85,9 @@ class Database:
 
                 CREATE INDEX clusters
                 ON clustering (cluster)
+
+				CREATE INDEX image_subjects_id
+				ON image_subjects (image_id);
             """
             print(query)
             conn.executescript(query)
@@ -349,7 +352,7 @@ class Database:
             print('Deleting group:', group_id, type(group_id))
             conn.execute('DELETE FROM groups WHERE group_id=?', (group_id,))
             conn.execute('DELETE FROM images WHERE group_id=?', (group_id,))
-            conn.execute('DELETE FROM subjects WHERE group_id=?', (group_id,))
+            conn.execute('DELETE FROM image_subjects WHERE group_id=?', (group_id,))
 
         @classmethod
         def add_group(cls, conn, group):

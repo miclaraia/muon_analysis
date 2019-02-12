@@ -16,6 +16,7 @@ def main(save_dir, database_file):
     storage = Storage(database)
 
     config = Config.load(save_dir)
+    config.type = 'decv2'
     Clustering.assign_clusters(config, storage)
 
 

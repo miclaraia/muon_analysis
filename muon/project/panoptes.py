@@ -6,6 +6,8 @@ from panoptes_client.subject import Subject
 from panoptes_client.panoptes import PanoptesAPIException
 
 import math
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Uploader:
@@ -20,7 +22,7 @@ class Uploader:
     @classmethod
     def client(cls):
         if cls._client is None:
-            cls._client = Panoptes(login='interactive')
+            cls._client = Panoptes.connect(login='interactive')
         return cls._client
 
     @staticmethod
@@ -35,15 +37,21 @@ class Uploader:
             print(subject_set)
             if subject_set.display_name == name:
                 return subject_set
+        logger.debug('Project: %s', self.project)
+        print(self.project)
         subject_set = SubjectSet()
 
         subject_set.links.project = project
         subject_set.display_name = name
 
-        subject_set.save()
+        # import code
+        # code.interact(local={**globals(), **locals()})
+        # subject_set.save()
         return subject_set
 
     def get_subjects(self):
+        return []
+        logger.debug([s for s in self.subject_set.subjects])
         return [(s.id, s.metadata['id']) for s in self.subject_set.subjects]
 
     def add_subject(self, subject):
@@ -52,8 +60,8 @@ class Uploader:
         try:
             subject.save()
         except PanoptesAPIException as e:
-            print('Cleaning up')
-            print('Removing subjects: %s' % str(self.subject_queue))
+            logger.info('Cleaning up')
+            logger.warn('Removing subjects: %s' % str(self.subject_queue))
             for subject in self.subject_queue:
                 Subject.delete(
                     subject.id, headers={'If-Match': subject.etag})
@@ -70,10 +78,10 @@ class Uploader:
 
         subjects: list of zooniverse subject ids
         """
-        print('Getting existing subjects')
+        logger.info('Getting existing subjects')
         subject_set = self.subject_set
         subjects = [s for s in subject_set.subjects if s.id in subjects]
-        print('Unlinking subjects')
+        logger.info('Unlinking subjects')
         print(subjects)
         subject_set.remove(subjects)
         subject_set.save()
