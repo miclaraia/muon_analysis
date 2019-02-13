@@ -44,13 +44,10 @@ class Uploader:
         subject_set.links.project = project
         subject_set.display_name = name
 
-        # import code
-        # code.interact(local={**globals(), **locals()})
-        # subject_set.save()
+        subject_set.save()
         return subject_set
 
     def get_subjects(self):
-        return []
         logger.debug([s for s in self.subject_set.subjects])
         return [(s.id, s.metadata['id']) for s in self.subject_set.subjects]
 

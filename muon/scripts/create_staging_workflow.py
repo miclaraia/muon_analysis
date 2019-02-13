@@ -35,30 +35,13 @@ def main(database_file, image_path):
     image_storage = ImageStorage(database)
 
     # new_group = image_storage.get_group(100)
-    with database.conn as conn:
-        database.ImageGroup.delete_group(conn, 100)
-        conn.commit()
+    # with database.conn as conn:
+        # database.ImageGroup.delete_group(conn, 100)
+        # conn.commit()
 
     image_group = image_storage.get_group(0)
-    images = [image_group.images[i] for i in ids]
-    for image in images:
-        image.group_id = 100
-    images = {i: image_group.images[i] for i in ids}
-
-
-    new_group = ImageGroup(
-        100, images, image_size=image_group.image_size,
-        image_width=image_group.image_width,
-        permutations=image_group.permutations,
-        description=image_group.description)
-    image_storage.add_group(new_group)
-
-
-    print(new_group.images)
-
-
-
-    new_group.upload_subjects(image_path)
+    image_group.images = {i: image_group.images[i] for i in ids}
+    image_group.upload_subjects(image_path)
 
     import code
     code.interact(local={**globals(), **locals()})
