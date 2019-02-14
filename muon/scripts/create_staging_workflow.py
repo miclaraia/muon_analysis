@@ -22,8 +22,8 @@ def main(database_file, image_path):
     muon.config.project = 1815
 
     pan.Uploader._client = pan.Panoptes.connect(
-        login='interactive',
         endpoint='https://panoptes-staging.zooniverse.org')
+    pan.Uploader._client.login()
 
     if not os.path.isdir(image_path):
         raise FileNotFoundError(image_path)

@@ -88,7 +88,7 @@ setup(
         'pylint',
         'sklearn',
         'scipy',
-        'panoptes_client',
+        'panoptes_client==1.0.3',
         'scikit-image',
         'pandas',
         'progressbar2',

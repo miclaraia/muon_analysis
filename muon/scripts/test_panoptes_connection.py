@@ -13,8 +13,8 @@ from panoptes_client.panoptes import PanoptesAPIException
 @click.group(invoke_without_command=True)
 def main():
     client = Panoptes.connect(
-        login='interactive',
         endpoint='https://panoptes-staging.zooniverse.org')
+    client.login()
 
     project = Project.find(1815)
     subject_set = SubjectSet()
