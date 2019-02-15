@@ -18,6 +18,7 @@ upload () {
         zoo:/home/larai002/Zooniverse/repos/muon/muon/scripts/models/decv2
 
     rsync setup.py zoo:/home/larai002/Zooniverse/repos/muon
+    rsync muon.env zoo:/home/larai002/Zooniverse/repos/muon
 
     rsync -rpv \
         --exclude="venv" \

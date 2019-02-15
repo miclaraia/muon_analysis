@@ -10,7 +10,8 @@ from muon.subjects.database import Database
 @click.group(invoke_without_command=True)
 @click.argument('input_file')
 @click.argument('database_file')
-def main(input_file, database_file):
+@click.option('--batch', nargs=1, type=int)
+def main(input_file, database_file, batch):
     database = Database(database_file)
     storage = Storage(database)
 
@@ -22,10 +23,13 @@ def main(input_file, database_file):
             subjects.append(subject)
             yield subject
 
-    storage.add_subjects(wrapper())
+    if batch:
+        storage.add_batch(wrapper())
+    else:
+        storage.add_subjects(wrapper(), batch)
 
-    labels = [(subject.id, subject.y) for subject in subjects]
-    storage.add_labels('vegas', labels)
+    subject_labels = [(subject.id, subject.y) for subject in subjects]
+    storage.add_labels('vegas', subject_labels)
 
 
 if __name__ == '__main__':

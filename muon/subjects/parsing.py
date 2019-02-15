@@ -162,23 +162,28 @@ class HDFParseQi:
 class ParseFits:
 
     @classmethod
-    def parse_row(cls, row):
+    def parse_row(cls, row, source):
         charge = row['Charge']
         label = int(row['IsMuon'])
 
-        metadata = {
-            'run': int(row['RunNum']),
-            'evt': int(row['EventNum']),
-            'tel': int(row['Telescop'])
-        }
+        # metadata = {
+            # 'run': int(row['RunNum']),
+            # 'evt': int(row['EventNum']),
+            # 'tel': int(row['Telescop'])
+        # }
 
-        return Subject(None, charge, metadata, label=label)
+        run = int(row['RunNum'])
+        evt = int(row['EventNum'])
+        tel = int(row['Telescop'])
+        source_id = 'run_{}_evt_{}_tel_{}'.format(run, evt, tel)
+
+        return Subject(None, charge, source_id, source=source, label=label)
     
     @classmethod
     def parse_file(cls, fname):
         with fits.open(fname) as hdul:
             data = hdul[1].data
             for row in data:
-                yield cls.parse_row(row)
+                yield cls.parse_row(row, os.path.basename(fname))
     
 

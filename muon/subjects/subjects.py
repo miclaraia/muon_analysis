@@ -203,6 +203,10 @@ class Subjects:
     def labeled_subjects(self):
         return self.subset([s.id for s in self.iter() if s.y in [0, 1]])
 
+    def apply_labels(self, labels):
+        for subject_id, label in labels:
+            self.subjects[subject_id].y = label
+
     @property
     def shape(self):
         l = len(self.subjects)

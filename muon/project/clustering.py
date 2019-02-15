@@ -11,35 +11,10 @@ SPLITS = {k: i for i, k in enumerate(['train', 'test', 'valid', 'train_dev'])}
 class Clustering:
 
     @classmethod
-    def reserve_test_set(cls, subject_storage, fraction=0.25):
-        # TODO need to make sure previous assignments are preserved
-        # or version the test set assignments somehow
-        database = subject_storage.database
-
-        with subject_storage.database.conn as conn:
-            test_set = list(database.Clustering \
-                    .get_subjects(conn, is_test=True))
-            train_set = list(database.Clustering \
-                    .get_subjects(conn, is_test=False))
-
-            n_add = int(0.25*(len(test_set)+len(train_set)) - len(test_set))
-            assert n_add >= 0
-
-            np.random.shuffle(train_set)
-            to_add = train_set[:n_add]
-
-            for subject_id in to_add:
-                database.Clustering.set_subject_test_flag(
-                    conn, subject_id, True)
-
-            conn.commit()
-
-    @classmethod
     def train_decv2(cls, config, subject_storage):
         database = subject_storage.database
         with database.conn as conn:
-            subject_ids = database.Clustering.get_subjects(conn, is_test=False)
-            subjects = subject_storage.get_subjects(subject_ids)
+            subjects = subject_storage.get_split_subjects('train')
             x = subjects.get_x()
 
         dec = DECv2(config, x.shape)
@@ -60,7 +35,7 @@ class Clustering:
         pass
 
     @classmethod
-    def assign_clusters(cls, config, subject_storage):
+    def assign_clusters(cls, config, subject_storage, cluster_name):
         database = subject_storage.database
 
         models = {
@@ -77,7 +52,8 @@ class Clustering:
 
         with database.conn as conn:
             for subject_id, cluster in cluster_pred:
-                database.Clustering.set_subject_cluster(conn, subject_id, cluster)
+                database.Clustering.add_subject_cluster(
+                    conn, subject_id, cluster_name, cluster)
             conn.commit()
 
     @classmethod
@@ -96,3 +72,4 @@ class Clustering:
             clusters = np.array([clusters[c] for c in sorted(clusters)])
 
             return clusters
+

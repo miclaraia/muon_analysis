@@ -6,19 +6,20 @@ from muon.utils.camera import Camera, CameraPlot, CameraRotate
 
 class Subject:
 
-    def __init__(self, id, charge, metadata, label=None):
+    def __init__(
+            self, id, charge,
+            source_id=None,
+            source=None,
+            zoo_id=None,
+            label=None):
+
         self.id = id
-        self.metadata = metadata
         self.x = self._normalize(charge)
         self.y = label
 
-        self.zoo_id = metadata.get('zoo_id')
-
-    @property
-    def event(self):
-        return (self.metadata['run'],
-                self.metadata['evt'],
-                self.metadata['tel'])
+        self.zoo_id = zoo_id
+        self.source_id = source_id
+        self.source = source
 
     def plot(self, ax, camera=None):
         if camera is None:
@@ -48,10 +49,9 @@ class Subject:
             yield CameraRotate().rotate(self.x, n)
 
     def __str__(self):
-        return 'id %d event %s' % \
-               (self.id, self.event)
+        return 'id {} zoo_id {} label {}'.format(self.id, self.zoo_id, self.y)
 
     def copy(self, n=0):
         x = CameraRotate().rotate(self.x, n)
-        return self.__class__(self.id, x, self.metadata, self.y)
+        return self.__class__(self.id, x, self.zoo_id, self.y)
 

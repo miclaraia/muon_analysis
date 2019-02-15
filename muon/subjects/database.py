@@ -73,12 +73,12 @@ class Database:
 
                     charge BLOB,
                     batch_id INTEGER, -- group subjects in batches
-                    split_id INTEGER -- which split group for training
+                    split_id INTEGER DEFAULT 0 -- which split group for training
                 );
                     CREATE INDEX IF NOT EXISTS subject_batch
                         ON subjects (batch_id);
                     CREATE INDEX IF NOT EXISTS subject_split
-                        ON subjects (split_id batch);
+                        ON subjects (split_id, batch_id);
 
 
 
@@ -92,11 +92,11 @@ class Database:
                 CREATE TABLE IF NOT EXISTS subject_clusters (
                     subject_id INTEGER,
                     cluster_name TEXT NOT NULL,
-                    cluster INTEGER,
+                    cluster INTEGER
                 );
 
-                    CREATE INDEX id_cluster
-                        ON clustering (cluster_name, subject_id);
+                    CREATE INDEX IF NOT EXISTS id_cluster
+                        ON subject_clusters (cluster_name, subject_id);
 
                 CREATE TABLE IF NOT EXISTS subject_labels (
                     subject_id integer,
@@ -104,7 +104,7 @@ class Database:
                     label integer
                 );
 
-                    CREATE INDEX subject_label_names 
+                    CREATE INDEX IF NOT EXISTS subject_label_names 
                         ON subject_labels (label_name, subject_id);
             """
             print(query)
@@ -125,6 +125,16 @@ class Database:
 
 
     class Subject:
+        _splits = {k: i for i, k in \
+                enumerate(['train', 'test', 'valid', 'train_dev'])}
+
+        @classmethod
+        def next_batch(cls, conn):
+            cursor = conn.execute('SELECT MAX(batch_id) FROM subjects')
+            next_id = cursor.fetchone()[0]
+            if next_id:
+                return next_id + 1
+            return 0
 
         @classmethod
         def next_id(cls, conn):
@@ -135,13 +145,16 @@ class Database:
             return 0
 
         @classmethod
-        def add_subject(cls, conn, subject, source_id, source, batch_id):
+        def add_subject(cls, conn, subject, batch_id, split_name):
+
+            split_id = cls._splits[split_name]
             # subject_id, run, evt, tel, charge, cluster, label
             data = {
                 'subject_id': subject.id,
-                'source_id': source_id,
-                'source': source,
+                'source_id': subject.source_id,
+                'source': subject.source,
                 'batch_id': batch_id,
+                'split_id': split_id,
                 'charge': subject.x.tostring(),
             }
             keys, values = zip(*data.items())
@@ -199,18 +212,12 @@ class Database:
         @classmethod
         def get_all_subjects(cls, conn):
             cursor = conn.execute(
-                'SELECT subject_id, run, evt, tel, charge FROM subjects')
+                'SELECT subject_id, charge FROM subjects')
             for row in cursor:
                 yield Subject(
                     id=row[0],
-                    metadata={
-                        'run': row[1],
-                        'evt': row[2],
-                        'tel': row[3]
-                    },
                     charge=np.fromstring(row[4], dtype=np.float32)
                 )
-
 
 
         @classmethod
@@ -240,14 +247,16 @@ class Database:
 
 
         @classmethod
-        def set_subject_split(cls, conn, subject_id, split_id):
+        def set_subject_split(cls, conn, subject_id, split_name):
+            split_id = cls._splits[split_name]
             cursor = conn.execute("""
                 UPDATE subjects SET split_id=?
                 WHERE subject_id=?""", (split_id, subject_id)
             )
 
         @classmethod
-        def get_split_subjects(cls, conn, split_id):
+        def get_split_subjects(cls, conn, split_name):
+            split_id = cls._splits[split_name]
             cursor = conn.execute(
                 'SELECT subject_id FROM subjects WHERE split_id=?',
                 (split_id,))
@@ -265,7 +274,7 @@ class Database:
 
         @classmethod
         def get_cluster_assignments(cls, conn, cluster_name):
-            cursor.execute("""
+            cursor = conn.execute("""
                 SELECT subject_id, cluster FROM subject_clusters
                 WHERE cluster_name=?""", (cluster_name,))
 
