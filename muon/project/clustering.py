@@ -35,7 +35,8 @@ class Clustering:
         pass
 
     @classmethod
-    def assign_clusters(cls, config, subject_storage, cluster_name):
+    def assign_clusters(cls, config, subject_storage, cluster_name,
+                        batch=None):
         database = subject_storage.database
 
         models = {
@@ -43,7 +44,10 @@ class Clustering:
             'multitask': None,
             'redec': None
         }
-        subjects = subject_storage.get_all_subjects()
+        if batch:
+            subjects = subject_storage.get_subject_batch(batch)
+        else:
+            subjects = subject_storage.get_all_subjects()
         subject_ids = subjects.keys()
         x = subjects.get_x()
 
@@ -53,7 +57,7 @@ class Clustering:
         with database.conn as conn:
             for subject_id, cluster in cluster_pred:
                 database.Clustering.add_subject_cluster(
-                    conn, subject_id, cluster_name, cluster)
+                    conn, subject_id, cluster_name, int(cluster))
             conn.commit()
 
     @classmethod

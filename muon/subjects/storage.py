@@ -88,6 +88,7 @@ class Storage:
         with self.conn as conn:
             subject_iter = self.database.Subject.get_subject_batch(conn, batch)
             subjects = Subjects(list(subject_iter))
+            return subjects
 
     def get_subjects(self, subject_ids):
         with self.conn as conn:

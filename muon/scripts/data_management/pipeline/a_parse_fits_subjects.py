@@ -24,9 +24,9 @@ def main(input_file, database_file, batch):
             yield subject
 
     if batch:
-        storage.add_batch(wrapper())
-    else:
         storage.add_subjects(wrapper(), batch)
+    else:
+        storage.add_batch(wrapper())
 
     subject_labels = [(subject.id, subject.y) for subject in subjects]
     storage.add_labels('vegas', subject_labels)

@@ -131,18 +131,18 @@ class Database:
         @classmethod
         def next_batch(cls, conn):
             cursor = conn.execute('SELECT MAX(batch_id) FROM subjects')
-            next_id = cursor.fetchone()[0]
-            if next_id:
-                return next_id + 1
-            return 0
+            last_id = cursor.fetchone()[0]
+            if last_id is None:
+                return 0
+            return last_id + 1
 
         @classmethod
         def next_id(cls, conn):
             cursor = conn.execute('SELECT MAX(subject_id) FROM subjects')
-            next_id = cursor.fetchone()[0]
-            if next_id:
-                return next_id + 1
-            return 0
+            last_id = cursor.fetchone()[0]
+            if last_id is None:
+                return 0
+            return last_id + 1
 
         @classmethod
         def add_subject(cls, conn, subject, batch_id, split_name):
@@ -190,7 +190,7 @@ class Database:
             row = cursor.fetchone()
             return Subject(
                 id=row[0],
-                charge=np.fromstring(row[4], dtype=np.float32)
+                charge=np.fromstring(row[1], dtype=np.float32)
             )
 
         @classmethod
@@ -201,7 +201,7 @@ class Database:
             for row in cursor:
                 yield Subject(
                     id=row[0],
-                    charge=np.fromstring(row[4], dtype=np.float32)
+                    charge=np.fromstring(row[1], dtype=np.float32)
                 )
 
         @classmethod
@@ -216,7 +216,7 @@ class Database:
             for row in cursor:
                 yield Subject(
                     id=row[0],
-                    charge=np.fromstring(row[4], dtype=np.float32)
+                    charge=np.fromstring(row[1], dtype=np.float32)
                 )
 
 
@@ -268,15 +268,31 @@ class Database:
         @classmethod
         def add_subject_cluster(cls, conn, subject_id, cluster_name, cluster):
             conn.execute("""
+                DELETE FROM subject_clusters
+                WHERE subject_id=? AND cluster_name=?""",
+                (subject_id, cluster_name))
+
+            conn.execute("""
                 INSERT INTO subject_clusters
                 (subject_id, cluster_name, cluster)
                 VALUES (?,?,?)""", (subject_id, cluster_name, cluster))
 
         @classmethod
-        def get_cluster_assignments(cls, conn, cluster_name):
-            cursor = conn.execute("""
-                SELECT subject_id, cluster FROM subject_clusters
-                WHERE cluster_name=?""", (cluster_name,))
+        def get_cluster_assignments(cls, conn, cluster_name, batch=None):
+            if batch:
+                cursor = conn.execute("""
+                    SELECT subject_clusters.subject_id, subject_clusters.cluster
+                    FROM subject_clusters
+                    INNER JOIN subjects
+                        ON subject_clusters.subject_id=subjects.subject_id
+                    WHERE
+                        cluster_name=?
+                        AND subjects.batch_id=?
+                    """, (cluster_name, batch))
+            else:
+                cursor = conn.execute("""
+                    SELECT subject_id, cluster FROM subject_clusters
+                    WHERE cluster_name=?""", (cluster_name,))
 
             clusters = {}
             for subject_id, cluster in tqdm(cursor):
@@ -293,7 +309,7 @@ class Database:
                     FROM subject_clusters
                 INNER JOIN subject_labels
                     ON subject_clusters.subject_id=subject_labels.subject_id
-                WHERE cluster_subjects.cluster_name=? 
+                WHERE subject_clusters.cluster_name=? 
                     AND subject_labels.label_name=?
                 ORDER BY subject_clusters.cluster ASC""",
                 (cluster_name, label_name,))
@@ -304,7 +320,7 @@ class Database:
         @classmethod
         def get_cluster_subjects(cls, conn, cluster_name, cluster):
             cursor = conn.execute("""
-                SELECT subject_id FROM cluster_subjects
+                SELECT subject_id FROM subject_clusters
                 WHERE cluster_name=? AND cluster=?""",
                 (cluster_name, cluster))
 
@@ -316,10 +332,10 @@ class Database:
         @classmethod
         def next_id(cls, conn):
             cursor = conn.execute('SELECT MAX(image_id) FROM images')
-            next_id = cursor.fetchone()[0]
-            if next_id:
-                return next_id + 1
-            return 0
+            last_id = cursor.fetchone()[0]
+            if last_id is None:
+                return 0
+            return last_id + 1
 
         @classmethod
         def add_image(cls, conn, image):
@@ -377,11 +393,11 @@ class Database:
 
         @classmethod
         def next_id(cls, conn):
-            cursor = conn.execute('SELECT MAX(group_id) FROM groups')
-            next_id = cursor.fetchone()[0]
-            if next_id:
-                return next_id + 1
-            return 0
+            cursor = conn.execute('SELECT MAX(group_id) FROM image_groups')
+            last_id = cursor.fetchone()[0]
+            if last_id is None:
+                return 0
+            return last_id + 1
 
         @classmethod
         def delete_group(cls, conn, group_id):

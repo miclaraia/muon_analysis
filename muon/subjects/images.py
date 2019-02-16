@@ -93,6 +93,8 @@ class Image:
             **meta
         }
         self.metadata.update({'figure': metadata})
+        # TODO make sure to actually update this data in the db
+        # Probably need to add new columns
 
         fig.savefig(fname, dpi=dpi)
 
@@ -364,7 +366,8 @@ class ImageStorage:
             return i
         return f
 
-    def new_group(self, subjects, image_size, **kwargs):
+    def new_group(self, subjects, image_size, cluster_name,
+                  batch=None, **kwargs):
         """
         Generate a file detailing which subjects belong in which image
         and their location in the image.
@@ -390,7 +393,11 @@ class ImageStorage:
 
         with self.conn as conn:
             cluster_assignments = self.database.Clustering \
-                .get_cluster_assignments(conn)
+                .get_cluster_assignments(conn, cluster_name, batch)
+        if not cluster_assignments:
+            logger.warn('cluster_assignments: {}', cluster_assignments)
+            raise Exception('Empty cluster assignment struct')
+
         group = ImageGroup.new(
             group_id, next_id, subjects, cluster_assignments,
             image_size=image_size, **kwargs)
