@@ -1,9 +1,13 @@
 import numpy as np
 from tqdm import tqdm
+from uuid import uuid4
+import sqlite3
+import logging
 
 from muon.subjects import Subject
 from muon.subjects import Subjects
-# TODO use some kind of database instead of hdf
+
+logger = logging.getLogger(__name__)
 
 
 class Storage:
@@ -22,14 +26,8 @@ class Storage:
 
     def add_subjects(self, subjects, batch_id):
         with self.conn as conn:
-            next_id = self.database.Subject.next_id(conn)
-
             for subject in tqdm(subjects):
-                subject.id = next_id
                 self._add_subject(conn, subject, batch_id)
-
-                next_id += 1
-
 
             # print(self.database.Subject.next_id(conn))
             # print(dir(self.database.Subject))
@@ -39,7 +37,6 @@ class Storage:
 
     def add_subject(self, subject, batch_id):
         with self.conn as conn:
-            subject.id = self.database.Subject.next_id(conn)
             self._add_subject(conn, subject, batch_id)
             conn.commit()
 
@@ -56,8 +53,20 @@ class Storage:
         p = list(split_probs.values())
         split = str(np.random.choice(k, 1, p=p)[0])
 
-        self.database.Subject.add_subject(
-            conn, subject, batch_id, split)
+        subject.id = str(uuid4())
+        try:
+            self.database.Subject.add_subject(
+                conn, subject, batch_id, split)
+        except sqlite3.IntegrityError as e:
+            logger.error(
+                'Integrity error, retrying with new subject id')
+            logger.exception(e)
+            subject.id = str(uuid4())
+            self._add_subject(conn, subject, batch_id)
+            self.database.Subject.add_subject(
+                conn, subject, batch_id, split)
+
+        return subject.id
 
     def add_labels(self, label_name, labels):
         skipped = []

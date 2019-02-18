@@ -39,11 +39,17 @@ class Database:
                     group_id integer,
                     cluster integer,
                     metadata text NOT NULL,
-                    zoo_id integer
+                    zoo_id integer,
+                    fig_dpi integer,
+                    fig_offset integer,
+                    fig_height integer,
+                    fig_width integer,
+                    fig_rows integer,
+                    fig_cols integer
                 );
 
                 CREATE TABLE IF NOT EXISTS image_subjects (
-                    subject_id integer,
+                    subject_id TEXT NOT NULL,
                     image_id integer,
                     group_id integer,
                     image_index integer
@@ -64,7 +70,7 @@ class Database:
 
 
                 CREATE TABLE IF NOT EXISTS subjects (
-                    subject_id integer PRIMARY KEY, -- assigned subject id
+                    subject_id TEXT PRIMARY KEY, -- assigned subject id
 
                     /* source run, event, and telescope id
                        store as run_event_tel */
@@ -83,14 +89,14 @@ class Database:
 
 
                 /*CREATE TABLE IF NOT EXISTS clustering (
-                    subject_id integer PRIMARY KEY,
+                    subject_id TEXT PRIMARY KEY,
                     cluster integer,
                     is_test boolean DEFAULT 0,
                     split integer
                 );*/
 
                 CREATE TABLE IF NOT EXISTS subject_clusters (
-                    subject_id INTEGER,
+                    subject_id TEXT NOT NULL,
                     cluster_name TEXT NOT NULL,
                     cluster INTEGER
                 );
@@ -99,12 +105,12 @@ class Database:
                         ON subject_clusters (cluster_name, subject_id);
 
                 CREATE TABLE IF NOT EXISTS subject_labels (
-                    subject_id integer,
+                    subject_id TEXT NOT NULL,
                     label_name text,
                     label integer
                 );
 
-                    CREATE INDEX IF NOT EXISTS subject_label_names 
+                    CREATE INDEX IF NOT EXISTS subject_label_names
                         ON subject_labels (label_name, subject_id);
             """
             print(query)
@@ -136,13 +142,13 @@ class Database:
                 return 0
             return last_id + 1
 
-        @classmethod
-        def next_id(cls, conn):
-            cursor = conn.execute('SELECT MAX(subject_id) FROM subjects')
-            last_id = cursor.fetchone()[0]
-            if last_id is None:
-                return 0
-            return last_id + 1
+        # @classmethod
+        # def next_id(cls, conn):
+            # cursor = conn.execute('SELECT MAX(subject_id) FROM subjects')
+            # last_id = cursor.fetchone()[0]
+            # if last_id is None:
+                # return 0
+            # return last_id + 1
 
         @classmethod
         def add_subject(cls, conn, subject, batch_id, split_name):
@@ -346,6 +352,16 @@ class Database:
                 'metadata': json.dumps(image.metadata),
                 'zoo_id': image.zoo_id
             }
+
+            if image.image_meta is not None:
+                data.update({
+                    'fig_dpi': image.image_meta.dpi,
+                    'fig_offset': image.image_meta.offset,
+                    'fig_height': image.image_meta.height,
+                    'fig_width': image.image_meta.width,
+                    'fig_rows': image.image_meta.rows,
+                    'fig_cols': image.image_meta.cols,
+                })
             keys, values = zip(*data.items())
 
             query = 'INSERT INTO images ({}) VALUES ({})'.format(
@@ -362,9 +378,34 @@ class Database:
             return image.image_id
 
         @classmethod
+        def update_image(cls, conn, image):
+            args = (json.dumps(image.metadata),
+                    image.image_meta.dpi,
+                    image.image_meta.offset,
+                    image.image_meta.height,
+                    image.image_meta.width,
+                    image.image_meta.rows,
+                    image.image_meta.cols,
+                    image.image_id)
+            conn.execute("""
+                UPDATE images
+                SET
+                    metadata=?,
+                    fig_dpi=?,
+                    fig_offset=?,
+                    fig_height=?,
+                    fig_width=?,
+                    fig_rows=?,
+                    fig_cols=?
+                WHERE image_id=?""", args)
+            
+
+        @classmethod
         def get_image(cls, conn, image_id):
             cursor = conn.execute("""
-                SELECT image_id, group_id, cluster, metadata, zoo_id
+                SELECT image_id, group_id, cluster, metadata, zoo_id,
+                       fig_dpi, fig_offset, fig_height, fig_width,
+                       fig_rows, fig_cols
                 FROM images WHERE image_id=?""", (image_id,))
             image = cursor.fetchone()
 
@@ -373,13 +414,22 @@ class Database:
                 WHERE image_id=?""", (image_id,))
             subjects = [row[0] for row in cursor]
 
+            image_meta = Image.ImageMeta(
+                dpi=image[5],
+                offset=image[6],
+                height=image[7],
+                width=image[8],
+                rows=image[9],
+                cols=image[10])
+
             return Image(
                 image_id=image[0],
                 group_id=image[1],
                 cluster=image[2],
                 metadata=json.loads(image[3]),
                 zoo_id=image[4],
-                subjects=subjects)
+                subjects=subjects,
+                image_meta=image_meta)
 
         @classmethod
         def get_group_images(cls, conn, group_id):

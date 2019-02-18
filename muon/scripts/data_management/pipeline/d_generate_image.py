@@ -17,6 +17,7 @@ def main(database_file, image_dir):
 
     group = image_storage.get_group(0)
     group.generate_images(subject_storage, image_dir)
+    image_storage.update_group(0)
 
 
 if __name__ == '__main__':

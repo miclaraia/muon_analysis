@@ -22,7 +22,7 @@ class Image:
     """
 
     def __init__(self, image_id, group_id,
-                 cluster, subjects, metadata, zoo_id=None):
+                 cluster, subjects, metadata, zoo_id=None, image_meta=None):
         self.image_id = image_id
         self.group_id = group_id
         self.cluster = cluster
@@ -30,11 +30,13 @@ class Image:
         self.metadata = metadata
         self.zoo_id = zoo_id
 
+        self.image_meta = image_meta
+        
     def __str__(self):
         return 'id {} group {} cluster {} subjects {} ' \
-               'metadata {} zooid {}'.format(
+               'metadata {} zooid {} image_meta {}'.format(
             self.image_id, self.group_id, self.cluster, len(self.subjects),
-            str(self.metadata), self.zoo_id)
+            str(self.metadata), self.zoo_id, self.image_meta)
 
     def __repr__(self):
         return str(self)
@@ -87,12 +89,8 @@ class Image:
         fig, meta = Subjects(subjects).plot_subjects(
             w=width, grid=True, grid_args={'offset': offset}, meta=True)
 
-        metadata = {
-            'dpi': dpi,
-            'offset': offset,
-            **meta
-        }
-        self.metadata.update({'figure': metadata})
+
+        self.image_meta = Image.ImageMeta(dpi=dpi, offset=offset, **meta)
         # TODO make sure to actually update this data in the db
         # Probably need to add new columns
 
@@ -104,23 +102,27 @@ class Image:
         """
         Return the subject that should be at the given x,y coordinates
         """
-        meta = self.metadata['figure']
-        logger.debug(meta)
-        dpi = meta['dpi']
-        offset = meta['offset']*dpi
-        height = meta['height']*dpi-offset
-        width = meta['width']*dpi-offset
+        dpi = self.image_meta.dpi
+        offset = self.image_meta.offset*dpi
+        height = self.image_meta.height*dpi - offset
+        width = self.image_meta.width*dpi - offset
 
-        if 'beta_image' in meta:
+        rows = self.image_meta.rows
+        cols = self.image_meta.cols
+
+        logger.debug(self.metadata)
+        logger.debug(self.image_meta)
+
+        if 'beta_image' in self.metadata:
             # This image was generated before the offset bug was discovered
             # and need to correct the vertical offset to get the right
             # boundary calculations
-            width = meta['width']*dpi*0.97
-            height = meta['height']*dpi*0.97
-            y = y - 0.03*meta['height']*dpi + offset
+            height = self.image_meta.height*dpi*0.97 - offset
+            width = self.image_meta.width*dpi*0.97 - offset
+            y = y - 0.03*self.image_meta.height*dpi + offset
 
-        y_ = height/meta['rows']
-        x_ = width/meta['cols']
+        y_ = height/rows
+        x_ = width/cols
         logger.debug('x: {}'.format(x))
         logger.debug('y: {}'.format(y))
         logger.debug('offset: {}'.format(offset))
@@ -133,9 +135,27 @@ class Image:
         x = (x-offset)//x_
         y = (y-offset)//y_
 
-        i = int(x+meta['cols']*y)
+        i = int(x+cols*y)
         logger.debug(i)
         return self.subjects[i]
+
+    class ImageMeta:
+        def __init__(self,
+                     dpi=None,
+                     offset=None,
+                     height=None,
+                     width=None,
+                     rows=None,
+                     cols=None):
+            self.dpi = dpi
+            self.offset = offset
+            self.height = height
+            self.width = width
+            self.rows = rows
+            self.cols = cols
+
+        def __str__(self):
+            return str(self.__dict__)
 
 
 class ImageGroup:
@@ -334,9 +354,13 @@ class ImageGroup:
         path = os.path.join(path, 'group_%d' % self.group_id)
         if not os.path.isdir(path):
             os.mkdir(path)
+        i = 0
         for image in self.iter():
             print(image)
             image.plot(self.image_width, subject_storage, path)
+            i += 1
+            if i > 5:
+                break
 
 
 class ImageStorage:
@@ -439,6 +463,14 @@ class ImageStorage:
     def list_groups(self):
         with self.conn as conn:
             self.database.ImageGroup.list_groups(conn)
+
+    def update_group(self, group_id):
+        group = self.get_group(group_id)
+
+        with self.conn as conn:
+            for image in group.iter():
+                self.database.Image.update_image(conn, image)
+            conn.commit()
 
     def save(self, groups=None):
         # TODO somehow manage upating the database
