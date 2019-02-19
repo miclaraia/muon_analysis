@@ -340,7 +340,7 @@ class Database:
             cursor = conn.execute('SELECT MAX(image_id) FROM images')
             last_id = cursor.fetchone()[0]
             if last_id is None:
-                return 0
+                return 2000
             return last_id + 1
 
         @classmethod
@@ -446,7 +446,7 @@ class Database:
             cursor = conn.execute('SELECT MAX(group_id) FROM image_groups')
             last_id = cursor.fetchone()[0]
             if last_id is None:
-                return 0
+                return 10
             return last_id + 1
 
         @classmethod
