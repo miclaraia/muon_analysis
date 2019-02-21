@@ -55,11 +55,12 @@ class Database:
                     image_index integer
                 );
                     CREATE INDEX image_subjects_id
-                    ON image_subjects (image_id);
+                    ON image_subjects (image_id, image_index);
 
 
                 CREATE TABLE IF NOT EXISTS image_groups (
                     group_id integer PRIMARY KEY,
+                    cluster_name TEXT NOT NULL,
                     image_size integer,
                     image_width integer,
                     description text,
@@ -491,6 +492,7 @@ class Database:
 
             data = {
                 'group_id': group.group_id,
+                'cluster_name': group.cluster_name,
                 'image_size': group.image_size,
                 'image_width': group.image_width,
                 'description': group.description,
@@ -512,17 +514,18 @@ class Database:
         @classmethod
         def get_group(cls, conn, group_id):
             cursor = conn.execute("""
-                SELECT group_id, image_size, image_width,
+                SELECT group_id, cluster_name, image_size, image_width,
                 description, permutations FROM image_groups WHERE group_id=?""",
                 (group_id,))
             group = cursor.fetchone()
 
             return ImageGroup(
                 group_id=group[0],
-                image_size=group[1],
-                image_width=group[2],
-                description=group[3],
-                permutations=group[4],
+                cluster_name=group[1],
+                image_size=group[2],
+                image_width=group[3],
+                description=group[4],
+                permutations=group[5],
                 images=None)
 
 

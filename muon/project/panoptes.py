@@ -22,7 +22,11 @@ class Uploader:
     @classmethod
     def client(cls):
         if cls._client is None:
-            cls._client = Panoptes.connect(login='interactive')
+            cls._client = Panoptes.connect()
+            cls._client.login()
+
+            if not cls._client.logged_in:
+                raise Exception('Not logged in!')
         return cls._client
 
     @staticmethod

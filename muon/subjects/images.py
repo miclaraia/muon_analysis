@@ -161,11 +161,12 @@ class Image:
 
 class ImageGroup:
 
-    def __init__(self, group_id, images, **kwargs):
+    def __init__(self, group_id, cluster_name, images, **kwargs):
         """
         
         Parameters:
             group
+            cluster_name
             images
             image_size
             width
@@ -174,6 +175,7 @@ class ImageGroup:
         """
 
         self.group_id = group_id
+        self.cluster_name = cluster_name
         self.image_size = kwargs.get('image_size', 36)
         self.image_width = kwargs.get('image_width', 6)
         self.description = kwargs.get('description', None)
@@ -184,7 +186,7 @@ class ImageGroup:
 
     @classmethod
     def new(cls, group_id, next_id,
-            subject_storage, cluster_assignments, **kwargs):
+            subject_storage, cluster_name, cluster_assignments, **kwargs):
         """
         Parameters:
             next_id: callback function to get next image id
@@ -248,6 +250,7 @@ class ImageGroup:
 
     def metadata(self):
         return {
+            'cluster_name': self.cluster_name,
             'image_size': self.image_size,
             'image_width': self.image_width,
             'group_id': self.group_id,
@@ -256,8 +259,9 @@ class ImageGroup:
         }
 
     def __str__(self):
-        s = 'group %s images %d metadata %s' % \
-            (str(self.group_id), len(self.images), self.metadata())
+        s = 'group %s cluster_name %s images %d metadata %s' % \
+            (str(self.group_id), self.cluster_name,
+             len(self.images), self.metadata())
         return s
 
     def __repr__(self):
@@ -344,6 +348,7 @@ class ImageGroup:
 
             subject = uploader.add_subject(subject)
             image.zoo_id = subject.id
+            yield image
 
         print('Uploading subjects')
         uploader.upload()
@@ -358,6 +363,7 @@ class ImageGroup:
         for image in self.iter():
             print(image)
             image.plot(self.image_width, subject_storage, path)
+            yield image
 
 
 class ImageStorage:
@@ -461,13 +467,9 @@ class ImageStorage:
         with self.conn as conn:
             self.database.ImageGroup.list_groups(conn)
 
-    def update_group(self, group):
-        if type(group) is int:
-            group = self.get_group(group)
-
+    def update_image(self, image):
         with self.conn as conn:
-            for image in group.iter():
-                self.database.Image.update_image(conn, image)
+            self.database.Image.update_image(conn, image)
             conn.commit()
 
     def save(self, groups=None):

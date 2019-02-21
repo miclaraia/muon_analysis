@@ -19,8 +19,8 @@ def main(database_file, image_dir, groups):
     for group in [int(g) for g in groups.split(',')]:
         print('Group', group)
         group = image_storage.get_group(group)
-        group.generate_images(subject_storage, image_dir)
-        image_storage.update_group(group)
+        for image in group.generate_images(subject_storage, image_dir):
+            image_storage.update_image(image)
 
 
 if __name__ == '__main__':
