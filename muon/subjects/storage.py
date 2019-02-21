@@ -19,28 +19,30 @@ class Storage:
     def conn(self):
         return self.database.conn
 
-    def add_batch(self, subjects):
+    def add_batch(self, subjects, label_name=None):
         with self.conn as conn:
             next_batch = self.database.Subject.next_batch(conn)
-        self.add_subjects(subjects, next_batch)
+        self.add_subjects(subjects, next_batch, label_name)
 
-    def add_subjects(self, subjects, batch_id):
+    def add_subjects(self, subjects, batch_id, label_name=None):
+
         with self.conn as conn:
             for subject in tqdm(subjects):
-                self._add_subject(conn, subject, batch_id)
+                self._add_subject(conn, subject, batch_id, label_name)
 
             # print(self.database.Subject.next_id(conn))
             # print(dir(self.database.Subject))
             # print(subjects, list(subjects))
             # self.database.Subject.add_subjects(conn, subjects)
+
             conn.commit()
 
-    def add_subject(self, subject, batch_id):
+    def add_subject(self, subject, batch_id, label_name=None):
         with self.conn as conn:
-            self._add_subject(conn, subject, batch_id)
+            self._add_subject(conn, subject, batch_id, label_name)
             conn.commit()
 
-    def _add_subject(self, conn, subject, batch_id):
+    def _add_subject(self, conn, subject, batch_id, label_name=None):
         split_probs = {
             'test': 0.25,
             'train': 0.75
@@ -65,6 +67,10 @@ class Storage:
             self._add_subject(conn, subject, batch_id)
             self.database.Subject.add_subject(
                 conn, subject, batch_id, split)
+
+        if label_name and subject.y is not None:
+            self.database.Subject \
+                .add_subject_label(subject.id, label_name, subject.y)
 
         return subject.id
 
@@ -93,16 +99,17 @@ class Storage:
                 self.database.Subject.get_all_subjects(conn))]
             return Subjects(subjects)
 
-    def get_subject_batch(self, batch):
+    def get_subject_batches(self, batches):
         with self.conn as conn:
-            subject_iter = self.database.Subject.get_subject_batch(conn, batch)
+            subject_iter = self.database.Subject \
+                .get_subject_batches(conn, batches)
             subjects = Subjects(list(subject_iter))
             return subjects
 
     def get_subjects(self, subject_ids):
         with self.conn as conn:
             subjects = []
-            for subject_id in subject_ids:
+            for subject_id in tqdm(subject_ids):
                 subjects.append(
                     self.database.Subject.get_subject(conn, subject_id))
 
@@ -111,10 +118,15 @@ class Storage:
         subjects = [self.get_subject(s) for s in tqdm(subjects)]
         return Subjects(subjects)
 
-    def get_split_subjects(self, split_name):
+    def get_split_subjects(self, split_name, batches=None):
         with self.conn as conn:
-            subject_ids = self.database.Subject. \
-                get_split_subjects(conn, split_name)
+            if batches:
+                subject_ids = self.database.Subject \
+                    .get_split_subjects_batches(conn, split_name, batches)
+            else:
+                subject_ids = self.database.Subject \
+                    .get_split_subjects(conn, split_name)
+
             return self.get_subjects(subject_ids)
 
     def get_subject_labels(self, subject_ids):

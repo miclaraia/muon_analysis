@@ -9,8 +9,8 @@ from muon.subjects.images import ImageStorage
 @click.group(invoke_without_command=True)
 @click.argument('database_file')
 @click.argument('cluster_name')
-@click.option('--batch', nargs=1, type=int)
-def main(database_file, cluster_name, batch):
+@click.option('--batches', required=True)
+def main(database_file, cluster_name, batches):
     database = Database(database_file)
     image_storage = ImageStorage(database)
     subject_storage = Storage(database)
@@ -19,10 +19,11 @@ def main(database_file, cluster_name, batch):
         'image_size': 36,
         'image_width': 6,
         'permutations': 1,
-        'batch': batch,
         'cluster_name': cluster_name
     }
-    image_storage.new_group(subject_storage, **kwargs)
+    for batch in [int(b) for b in batches.split(',')]:
+        print('batch', batch)
+        image_storage.new_group(subject_storage, batch=batch, **kwargs)
 
     with image_storage.conn as conn:
         import code

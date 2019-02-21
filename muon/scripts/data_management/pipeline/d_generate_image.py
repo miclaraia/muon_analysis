@@ -10,14 +10,17 @@ from muon.subjects.images import ImageStorage
 @click.group(invoke_without_command=True)
 @click.argument('database_file')
 @click.argument('image_dir')
-def main(database_file, image_dir):
+@click.option('--groups', required=True)
+def main(database_file, image_dir, groups):
     database = Database(database_file)
     image_storage = ImageStorage(database)
     subject_storage = Storage(database)
 
-    group = image_storage.get_group(0)
-    group.generate_images(subject_storage, image_dir)
-    image_storage.update_group(0)
+    for group in [int(g) for g in groups.split(',')]:
+        print('Group', group)
+        group = image_storage.get_group(group)
+        group.generate_images(subject_storage, image_dir)
+        image_storage.update_group(group)
 
 
 if __name__ == '__main__':

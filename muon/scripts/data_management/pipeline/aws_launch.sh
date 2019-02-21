@@ -44,6 +44,7 @@ ${MUON}/muon/scripts/aws_deploy/aws.sh \
     launch --script ${HERE}/train_model.py \
     "--database_file ${DATA} \
     --name ${NAME} \
-    --save_dir ${SAVEDIR}"
+    --save_dir ${SAVEDIR} \
+    $@"
 
 

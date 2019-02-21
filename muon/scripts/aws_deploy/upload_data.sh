@@ -42,7 +42,7 @@ rsync -e "$SSH_PRE" ${HERE}/muon.env $HOST:\${HOME}
 $SSH << EOF
 set -xv
 source \${HOME}/muon.env
-if [ -z \$(mount | grep /mnt/muon) ]; then
+if [ -z "\$(mount | grep /mnt/muon)" ]; then
     sudo mkdir -p /mnt/muon
     sudo mount -U ${DEVICE} /mnt/muon
     sudo chmod 777 /mnt/muon
@@ -55,19 +55,25 @@ fi
 EOF
 
 cat > /tmp/upload_aws_muon_files.txt << EOF
-clustering_models/
-subjects/
+subjects-main/data-main.db
 EOF
 
-rsync -rcPv -e "$SSH_PRE" \
+#rsync -rcPv -e "$SSH_PRE" \
+cat > /tmp/rsync_muon_data.sh << EOF
+    rsync -rPv -e "$SSH_PRE" \
     --files-from=/tmp/upload_aws_muon_files.txt \
-    --exclude 'clustering_models/' \
-    --exclude 'clustering_models/aws' \
-    --exclude 'clustering_models/run*' \
-    --exclude 'clustering_models/hugh' \
-    --exclude 'clustering_models/volunteer' \
-    --exclude 'clustering_models/decv2' \
     ${MUOND} $HOST:/mnt/muon/data
 rm /tmp/upload_aws_muon_files.txt
+rm /tmp/rsync_muon_data.sh
+EOF
+
+screen -S "upload_muon_data" -m -d bash /tmp/rsync_muon_data.sh
+    #--exclude 'clustering_models/' \
+    #--exclude 'clustering_models/aws' \
+    #--exclude 'clustering_models/run*' \
+    #--exclude 'clustering_models/hugh' \
+    #--exclude 'clustering_models/volunteer' \
+    #--exclude 'clustering_models/decv2' \
+    #${MUOND} $HOST:/mnt/muon/data
 
 #$ssha sudo umount /mnt/data

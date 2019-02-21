@@ -67,13 +67,14 @@ class Image:
         Generate and save a plot of this image
         """
         # subjects = subject_storage.get_subjects(self.subjects)
-        subjects = {}
+        subjects = []
+        keys = set()
         for s in self.subjects:
             subject = subject_storage.get_subject(s)
-            if s in subjects:
-                subjects['{}-duplicate'.format(s)] = subject
-            else:
-                subjects[s] = subject
+            if subject.id in keys:
+                subject.id = subject.id+'-duplicate'
+            keys.add(subject.id)
+            subjects.append(subject)
 
         fname = self.fname()
 
@@ -354,13 +355,9 @@ class ImageGroup:
         path = os.path.join(path, 'group_%d' % self.group_id)
         if not os.path.isdir(path):
             os.mkdir(path)
-        i = 0
         for image in self.iter():
             print(image)
             image.plot(self.image_width, subject_storage, path)
-            i += 1
-            if i > 5:
-                break
 
 
 class ImageStorage:
@@ -391,7 +388,7 @@ class ImageStorage:
         return f
 
     def new_group(self, subjects, image_size, cluster_name,
-                  batch=None, **kwargs):
+                  batch, **kwargs):
         """
         Generate a file detailing which subjects belong in which image
         and their location in the image.
@@ -464,8 +461,9 @@ class ImageStorage:
         with self.conn as conn:
             self.database.ImageGroup.list_groups(conn)
 
-    def update_group(self, group_id):
-        group = self.get_group(group_id)
+    def update_group(self, group):
+        if type(group) is int:
+            group = self.get_group(group)
 
         with self.conn as conn:
             for image in group.iter():

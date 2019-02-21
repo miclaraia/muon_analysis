@@ -82,9 +82,13 @@ class Database:
                     split_id INTEGER DEFAULT 0 -- which split group for training
                 );
                     CREATE INDEX IF NOT EXISTS subject_batch
-                        ON subjects (batch_id);
+                        ON subjects (batch_id, split_id);
                     CREATE INDEX IF NOT EXISTS subject_split
-                        ON subjects (split_id, batch_id);
+                        ON subjects (split_id);
+                    CREATE INDEX IF NOT EXISTS subject_source_id
+                        ON subjects (source_id);
+                    CREATE INDEX IF NOT EXISTS subject_source
+                        ON subjects (source);
 
 
 
@@ -110,6 +114,8 @@ class Database:
                     label integer
                 );
 
+                    CREATE INDEX IF NOT EXISTS subject_label
+                        ON subject_labels (subject_id);
                     CREATE INDEX IF NOT EXISTS subject_label_names
                         ON subject_labels (label_name, subject_id);
             """
@@ -211,6 +217,12 @@ class Database:
                 )
 
         @classmethod
+        def get_subject_batches(cls, conn, batches):
+            for batch_id in batches:
+                for row in cls.get_subject_batch(conn, batch_id):
+                    yield row
+
+        @classmethod
         def get_subjects(cls, conn, subject_ids):
             for subject_id in tqdm(subject_ids):
                 yield cls.get_subject(conn, subject_id)
@@ -268,6 +280,23 @@ class Database:
                 (split_id,))
             for row in cursor:
                 yield row[0]
+
+        @classmethod
+        def get_split_subjects_batch(cls, conn, split_name, batch_id):
+            split_id = cls._splits[split_name]
+            cursor = conn.execute("""
+                SELECT subject_id FROM subjects
+                WHERE split_id=? and batch_id=?
+                """, (split_id, batch_id))
+            for row in cursor:
+                yield row[0]
+
+        @classmethod
+        def get_split_subjects_batches(cls, conn, split_name, batches):
+            for batch in batches:
+                for row in cls.get_split_subjects_batch(
+                        conn, split_name, batch):
+                    yield row
 
     class Clustering:
 
@@ -411,7 +440,8 @@ class Database:
 
             cursor = conn.execute("""
                 SELECT subject_id FROM image_subjects 
-                WHERE image_id=?""", (image_id,))
+                WHERE image_id=?
+                ORDER BY image_index ASC""", (image_id,))
             subjects = [row[0] for row in cursor]
 
             image_meta = Image.ImageMeta(

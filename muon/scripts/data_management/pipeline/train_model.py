@@ -21,11 +21,12 @@ from redec_keras.models.decv2 import Config
 @click.option('--name')
 @click.option('--save_dir')
 @click.option('--database_file')
-def main(name, save_dir, database_file):
+@click.option('--batches')
+def main(name, save_dir, database_file, batches):
     database = Database(database_file)
     storage = Storage(database)
 
-    Clustering.reserve_test_set(storage)
+    # Clustering.reserve_test_set(storage)
 
     config_args = {
         'save_dir': save_dir,
@@ -44,7 +45,14 @@ def main(name, save_dir, database_file):
     config = Config(**config_args)
     config.dump()
 
-    Clustering.train_decv2(config, storage)
+    if batches:
+        batches = [int(b) for b in batches.split(',')]
+    print(batches)
+    subjects = storage.get_split_subjects('train', batches=batches)
+    x = subjects.get_x()
+    del subjects
+
+    Clustering.train_decv2(config, x)
 
 
 if __name__ == '__main__':
