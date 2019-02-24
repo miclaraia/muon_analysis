@@ -60,12 +60,21 @@ class Image:
         """
         Filename to use for this subject group
         """
-        return 'muon_group_%d_id_%d.png' % (self.group_id, self.image_id)
+        return 'muon_group_%d_id_%d.jpg' % (self.group_id, self.image_id)
 
-    def plot(self, width, subject_storage, path=None):
+    def plot(self, width, subject_storage, dpi=None, quality=None, path=None):
         """
         Generate and save a plot of this image
         """
+        fname = self.fname()
+        # Skip if image already exists
+        if fname in os.listdir(path):
+            return False
+        if path:
+            fname = os.path.join(path, fname)
+        if quality is None:
+            quality = 95
+
         # subjects = subject_storage.get_subjects(self.subjects)
         subjects = []
         keys = set()
@@ -76,17 +85,8 @@ class Image:
             keys.add(subject.id)
             subjects.append(subject)
 
-        fname = self.fname()
-
-        # Skip if image already exists
-        if fname in os.listdir(path):
-            return
-
-        if path:
-            fname = os.path.join(path, fname)
-
         offset = .5
-        dpi = 100
+        dpi = dpi or 50
         fig, meta = Subjects(subjects).plot_subjects(
             w=width, grid=True, grid_args={'offset': offset}, meta=True)
 
@@ -95,9 +95,10 @@ class Image:
         # TODO make sure to actually update this data in the db
         # Probably need to add new columns
 
-        fig.savefig(fname, dpi=dpi)
+        fig.savefig(fname, dpi=dpi, quality=quality)
 
         plt.close(fig)
+        return True
 
     def at_location(self, x, y):
         """
@@ -353,7 +354,7 @@ class ImageGroup:
         print('Uploading subjects')
         uploader.upload()
 
-    def generate_images(self, subject_storage, path=None):
+    def generate_images(self, subject_storage, dpi=None, path=None):
         """
         Generate subject images to be uploaded to Panoptes
         """
@@ -361,9 +362,10 @@ class ImageGroup:
         if not os.path.isdir(path):
             os.mkdir(path)
         for image in self.iter():
-            print(image)
-            image.plot(self.image_width, subject_storage, path)
-            yield image
+            if image.plot(self.image_width, subject_storage,
+                          dpi=dpi, path=path):
+                print(image)
+                yield image
 
 
 class ImageStorage:

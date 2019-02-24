@@ -70,6 +70,9 @@ class Uploader:
 
         self.subject_queue.append(subject)
 
+        if len(self.subject_queue) >= 1000:
+            self.upload()
+
         print(subject)
         return subject
 

@@ -21,14 +21,14 @@ logging.warn('%s', logger.level)
 def main(database_file, image_path, groups):
     database = Database(database_file)
     image_storage = ImageStorage(database)
-    pan.Uploader.client
+    pan.Uploader.client()
 
     for group in [int(g) for g in groups.split(',')]:
         logger.info('Group %d', group)
         image_group = image_storage.get_group(group)
 
         for image in tqdm(image_group.upload_subjects(image_path)):
-            logger.info('image %d', str(image))
+            logger.info('image %s', str(image))
             image_storage.update_image(image)
 
 if __name__ == '__main__':
