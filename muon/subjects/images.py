@@ -328,16 +328,17 @@ class ImageGroup:
         Upload generated images to Panoptes
         """
         uploader = panoptes.Uploader(muon.config.project, self.group_id)
-        existing_subjects = uploader.get_subjects()
-        existing_subjects = {k: v for v, k in existing_subjects}
 
         print('Creating Panoptes subjects')
         for image in self.iter():
             # Skip images that are already uploaded and linked to the
             # subject set, and make sure the zoo_id map is correct
-            if image.image_id in existing_subjects:
-                image.zoo_id = existing_subjects[image.image_id]
-                print('Skipping %s' % image)
+            if image.zoo_id is not None:
+                subject = panoptes.Subject.find(image.zoo_id)
+                if subject.metadata['id'] != image.image_id:
+                    print(image, subject, subject.metadata['id'])
+                    raise Exception('Zoo_id does not match!')
+                print('Skipping {}'.format(image))
                 continue
 
             fname = os.path.join(
@@ -471,7 +472,12 @@ class ImageStorage:
 
     def update_image(self, image):
         with self.conn as conn:
-            self.database.Image.update_image(conn, image)
+            self.database.Image.update_figure(conn, image)
+            conn.commit()
+
+    def update_image_zooid(self, image):
+        with self.conn as conn:
+            self.database.Image.update_zooid(conn, image)
             conn.commit()
 
     def save(self, groups=None):

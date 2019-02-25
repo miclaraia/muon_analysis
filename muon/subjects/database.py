@@ -408,7 +408,14 @@ class Database:
             return image.image_id
 
         @classmethod
-        def update_image(cls, conn, image):
+        def update_zooid(cls, conn, image):
+            conn.execute("""
+                UPDATE images 
+                SET zoo_id=?
+                WHERE image_id=?""", (image.zoo_id, image.image_id))
+
+        @classmethod
+        def update_figure(cls, conn, image):
             args = (json.dumps(image.metadata),
                     image.image_meta.dpi,
                     image.image_meta.offset,

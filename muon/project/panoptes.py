@@ -40,6 +40,7 @@ class Uploader:
         for subject_set in project.links.subject_sets:
             print(subject_set)
             if subject_set.display_name == name:
+                logger.debug('Using subjec_set %s', subject_set)
                 return subject_set
         logger.debug('Project: %s', self.project)
         print(self.project)

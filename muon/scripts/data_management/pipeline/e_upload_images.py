@@ -29,7 +29,7 @@ def main(database_file, image_path, groups):
 
         for image in tqdm(image_group.upload_subjects(image_path)):
             logger.info('image %s', str(image))
-            image_storage.update_image(image)
+            image_storage.update_image_zooid(image)
 
 if __name__ == '__main__':
     main()
