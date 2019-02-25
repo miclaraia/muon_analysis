@@ -323,7 +323,7 @@ class ImageGroup:
             # if image.id in images:
                 # image.metadata['deleted'] = True
 
-    def upload_subjects(self, path):
+    def upload_subjects(self, path, existing_subjects=None):
         """
         Upload generated images to Panoptes
         """
@@ -331,26 +331,32 @@ class ImageGroup:
 
         print('Creating Panoptes subjects')
         for image in self.iter():
-            # Skip images that are already uploaded and linked to the
-            # subject set, and make sure the zoo_id map is correct
-            if image.zoo_id is not None:
-                subject = panoptes.Subject.find(image.zoo_id)
-                if subject.metadata['id'] != image.image_id:
-                    print(image, subject, subject.metadata['id'])
-                    raise Exception('Zoo_id does not match!')
-                print('Skipping {}'.format(image))
-                continue
 
-            fname = os.path.join(
-                path, 'group_%d' % self.group_id, image.fname())
+            if existing_subjects and image.image_id in existing_subjects:
+                zoo_id = existing_subjects[image.image_id]
+                if image.image_id != zoo_id:
+                    image.zoo_id = zoo_id
+                    # TODO imageGroup class should have direct access to db
+                    yield image
+                else:
+                    print('Skipping {}'.format(image))
+                    continue
 
-            subject = panoptes.Subject()
-            subject.add_location(fname)
-            subject.metadata.update(image.dump_manifest())
+            elif image.zoo_id is not None:
+                print(image)
+                raise Exception('Found subject with existing zoo_id '
+                                'but cannot find associated subject in export')
+            else:
+                fname = os.path.join(
+                    path, 'group_%d' % self.group_id, image.fname())
 
-            subject = uploader.add_subject(subject)
-            image.zoo_id = subject.id
-            yield image
+                subject = panoptes.Subject()
+                subject.add_location(fname)
+                subject.metadata.update(image.dump_manifest())
+
+                subject = uploader.add_subject(subject)
+                image.zoo_id = subject.id
+                yield image
 
         print('Uploading subjects')
         uploader.upload()
