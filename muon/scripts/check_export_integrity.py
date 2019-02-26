@@ -48,7 +48,7 @@ def main(database_file, subject_export):
                     no_zoo += 1
                     print('no zooniverse subject {} {}'.format(image_id, zoo_id))
                     image.zoo_id = None
-                    database.update_zooid(conn, image)
+                    database.Image.update_zooid(conn, image)
 
         conn.commit()
 

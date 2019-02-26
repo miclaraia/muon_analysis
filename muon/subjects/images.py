@@ -334,7 +334,8 @@ class ImageGroup:
 
             if existing_subjects and image.image_id in existing_subjects:
                 zoo_id = existing_subjects[image.image_id]
-                if image.image_id != zoo_id:
+                if image.zoo_id != zoo_id:
+                    logger.debug('Updating image zoo id')
                     image.zoo_id = zoo_id
                     # TODO imageGroup class should have direct access to db
                     yield image
