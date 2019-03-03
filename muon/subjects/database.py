@@ -119,6 +119,13 @@ class Database:
                         ON subject_labels (subject_id);
                     CREATE INDEX IF NOT EXISTS subject_label_names
                         ON subject_labels (label_name, subject_id);
+
+                CREATE TABLE IF NOT EXISTS sources (
+                    source_id TEXT PRIMARY KEY,
+                    hash TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    updated TEXT NOT NULL
+                );
             """
             print(query)
             conn.executescript(query)
@@ -245,6 +252,15 @@ class Database:
                 SELECT label FROM subject_labels WHERE
                 subject_id=? AND label_name=?""", (subject_id, label_name))
             return cursor.fetchone()[0]
+
+        @classmethod
+        def get_source_subject(cls, conn, source_id):
+            cursor = conn.execute("""
+                SELECT subject_id FROM subjects
+                WHERE source_id=?""", (source_id,))
+            row = cursor.fetchone()
+            if row:
+                return row[0]
 
         @classmethod
         def list_label_names(cls, conn):
@@ -534,6 +550,38 @@ class Database:
                 description=group[4],
                 permutations=group[5],
                 images=None)
+
+
+    class Source:
+
+        @classmethod
+        def add_source(cls, conn, source):
+            data = {
+                'source_id': source.source_id,
+                'hash': source.hash,
+                'location': source.fname,
+                'updated': source.updated,
+            }
+
+            keys, values = zip(*data.items())
+
+            query = 'INSERT INTO sources ({}) VALUES ({})'.format(
+                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
+            conn.execute(query, values)
+
+        @classmethod
+        def get_source(cls, conn, source_id):
+            cursor = conn.execute("""
+                SELECT source_id, hash, location, updated
+                FROM sources
+                WHERE source_id=?""", (source_id))
+
+            row = cursor.fetchone()
+            fields = ['source_id', 'hash', 'location', 'updated']
+            return Source(**{k: row[i] for i, k in enumerate(fields)})
+
+
+
 
 
 

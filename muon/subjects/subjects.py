@@ -1,12 +1,8 @@
 
 from collections import OrderedDict
-import os
-import re
 import numpy as np
-import h5py
 import random
 import math
-import progressbar
 import matplotlib.pyplot as plt
 import string
 

@@ -43,6 +43,15 @@ class Storage:
             conn.commit()
 
     def _add_subject(self, conn, subject, batch_id, label_name=None):
+
+        existing_id = self.database.Subject \
+            .get_source_subject(conn, subject.source_id)
+
+        if not existing_id:
+            logger.info('Subject ({}, {}) already in database, skipping'
+                .format(existing_id, subject.source_id))
+            return existing_id
+
         split_probs = {
             'test': 0.25,
             'train': 0.75

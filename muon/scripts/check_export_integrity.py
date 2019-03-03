@@ -38,7 +38,7 @@ def main(database_file, subject_export):
                     wrong_id += 1
                     print('wrong zoo id {}'.format(image_id))
                     image.zoo_id = zoo_id
-                    database.update_zooid(conn, image)
+                    database.Image.update_zooid(conn, image)
 
             else:
                 if image.zoo_id is not None:
