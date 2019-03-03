@@ -17,7 +17,7 @@ class Uploader:
         self.client()
         self.project = self.get_project(project)
         self.subject_set = self.get_subject_set(group)
-        self.subject_queue = []
+        # self.subject_queue = []
 
     @classmethod
     def client(cls):
@@ -38,9 +38,9 @@ class Uploader:
         name = 'Auto_Group_%d' % group
 
         for subject_set in project.links.subject_sets:
-            print(subject_set)
+            print(subject_set, subject_set.display_name)
             if subject_set.display_name == name:
-                logger.debug('Using subjec_set %s', subject_set)
+                logger.debug('Using subject_set %s', subject_set)
                 return subject_set
         logger.debug('Project: %s', self.project)
         print(self.project)
@@ -59,22 +59,10 @@ class Uploader:
     def add_subject(self, subject):
         subject.links.project = self.project
 
-        try:
-            subject.save()
-        except PanoptesAPIException as e:
-            logger.info('Cleaning up')
-            logger.warn('Removing subjects: %s' % str(self.subject_queue))
-            for subject in self.subject_queue:
-                Subject.delete(
-                    subject.id, headers={'If-Match': subject.etag})
-            raise e
+        subject.save()
+        self.subject_set.add([subject])
+        self.subject_set.save()
 
-        self.subject_queue.append(subject)
-
-        if len(self.subject_queue) >= 1000:
-            self.upload()
-
-        print(subject)
         return subject
 
     def unlink_subjects(self, subjects, delete=True):
@@ -96,15 +84,15 @@ class Uploader:
             # for s in subjects:
                 # Subject.delete(s.id, headers={'If-Match': s.etag})
 
-    def upload(self):
-        print('Linking %d subjects to subject set %s' %
-              (len(self.subject_queue), self.subject_set))
-        subjects = self.subject_queue
-        l = len(subjects)
-        for i in range(math.ceil(l/1000)):
-            a = i*1000
-            b = min((i+1)*1000, l)
-            self.subject_set.add(subjects[a:b])
-            self.subject_set.save()
+    # def upload(self):
+        # print('Linking %d subjects to subject set %s' %
+              # (len(self.subject_queue), self.subject_set))
+        # subjects = self.subject_queue
+        # l = len(subjects)
+        # for i in range(math.ceil(l/1000)):
+            # a = i*1000
+            # b = min((i+1)*1000, l)
+            # self.subject_set.add(subjects[a:b])
+            # self.subject_set.save()
 
-        self.subject_queue = []
+        # self.subject_queue = []

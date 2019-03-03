@@ -359,9 +359,6 @@ class ImageGroup:
                 image.zoo_id = subject.id
                 yield image
 
-        print('Uploading subjects')
-        uploader.upload()
-
     def generate_images(self, subject_storage, dpi=None, path=None):
         """
         Generate subject images to be uploaded to Panoptes
