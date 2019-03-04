@@ -53,8 +53,10 @@ class Uploader:
         return subject_set
 
     def get_subjects(self):
-        logger.debug([s for s in self.subject_set.subjects])
-        return [(s.id, s.metadata['id']) for s in self.subject_set.subjects]
+        for s in self.subject_set.subjects:
+            logger.debug(s)
+            logger.debug(s.metadata)
+            yield s
 
     def add_subject(self, subject):
         subject.links.project = self.project
@@ -71,9 +73,7 @@ class Uploader:
 
         subjects: list of zooniverse subject ids
         """
-        logger.info('Getting existing subjects')
         subject_set = self.subject_set
-        subjects = [s for s in subject_set.subjects if s.id in subjects]
         logger.info('Unlinking subjects')
         print(subjects)
         subject_set.remove(subjects)

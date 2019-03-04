@@ -490,7 +490,7 @@ class Database:
             cursor = conn.execute(
                 'SELECT image_id FROM images WHERE group_id=?', (group_id,))
             for row in cursor:
-                yield cls.get_image(conn, row[0])
+                yield row[0]
 
     class ImageGroup:
         # TODO add update methods

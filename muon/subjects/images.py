@@ -332,22 +332,26 @@ class ImageGroup:
         print('Creating Panoptes subjects')
         for image in self.iter():
 
-            if existing_subjects and image.image_id in existing_subjects:
-                zoo_id = existing_subjects[image.image_id]
-                if image.zoo_id != zoo_id:
-                    logger.debug('Updating image zoo id')
-                    image.zoo_id = zoo_id
-                    # TODO imageGroup class should have direct access to db
-                    yield image
-                else:
-                    print('Skipping {}'.format(image))
-                    continue
+            if existing_subjects:
+                if image.image_id in existing_subjects:
+                    zoo_id = existing_subjects[image.image_id]
+                    if image.zoo_id != zoo_id:
+                        logger.debug('Updating image zoo id')
+                        image.zoo_id = zoo_id
+                        # TODO imageGroup class should have direct access to db
+                        yield image
+                    else:
+                        print('Skipping {}'.format(image))
+                        continue
 
+                elif image.zoo_id is not None:
+                    print(image)
+                    raise Exception('Found subject with existing zoo_id '
+                                    'but cannot find associated subject in export')
             elif image.zoo_id is not None:
-                print(image)
-                raise Exception('Found subject with existing zoo_id '
-                                'but cannot find associated subject in export')
-            else:
+                print('skipping {}'.format(image))
+                continue
+            elif image.zoo_id is None:
                 fname = os.path.join(
                     path, 'group_%d' % self.group_id, image.fname())
 
@@ -358,6 +362,8 @@ class ImageGroup:
                 subject = uploader.add_subject(subject)
                 image.zoo_id = subject.id
                 yield image
+            else:
+                raise Exception
 
     def generate_images(self, subject_storage, dpi=None, path=None):
         """
@@ -464,9 +470,12 @@ class ImageStorage:
     def load_group(self, group_id):
         with self.conn as conn:
             group = self.database.ImageGroup.get_group(conn, group_id)
-            images = self.database.Image.get_group_images(conn, group_id)
+            image_ids = self.database.Image.get_group_images(conn, group_id)
 
-            images = {image.image_id: image for image in tqdm(images)}
+            images = {}
+            for image_id in tqdm(image_ids):
+                images[image_id] = self.database.Image \
+                    .get_image(conn, image_id)
             group.images = images
             return group
 
