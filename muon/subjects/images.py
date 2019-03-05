@@ -372,7 +372,11 @@ class ImageGroup:
         path = os.path.join(path, 'group_%d' % self.group_id)
         if not os.path.isdir(path):
             os.mkdir(path)
-        for image in self.iter():
+
+        image_ids = list(self.images.keys())
+        random.shuffle(image_ids)
+        for image_id in image_ids:
+            image = self.images[image_id]
             if image.plot(self.image_width, subject_storage,
                           dpi=dpi, path=path):
                 print(image)
