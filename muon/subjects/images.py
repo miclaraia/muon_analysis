@@ -330,7 +330,10 @@ class ImageGroup:
         uploader = panoptes.Uploader(muon.config.project, self.group_id)
 
         print('Creating Panoptes subjects')
-        for image in self.iter():
+        image_ids = list(self.images.keys())
+        random.shuffle(image_ids)
+        for image_id in image_ids:
+            image = self.images[image_id]
 
             if existing_subjects:
                 if image.image_id in existing_subjects:
