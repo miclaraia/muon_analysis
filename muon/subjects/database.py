@@ -492,6 +492,15 @@ class Database:
             for row in cursor:
                 yield row[0]
 
+        @classmethod
+        def get_image_subjects(cls, conn, image_id):
+            cursor = conn.execute("""
+                SELECT subject_id FROM image_subjects
+                WHERE image_id=?
+                ORDER BY image_index ASC""", (image_id,))
+            for row in cursor:
+                yield row[0]
+
     class ImageGroup:
         # TODO add update methods
 

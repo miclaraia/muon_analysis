@@ -16,27 +16,99 @@ import muon.data
 logger = logging.getLogger(__name__)
 
 
-class Image:
+class StorageObject:
+
+    def __init__(self, database):
+        self.database = database
+
+    @property
+    def conn(self):
+        return self.database.conn
+
+
+class StorageAttribute:
+
+    def __init__(self, name, value, update_callback):
+        self.name = name
+        self.value = value
+        self.has_changed = False
+        self.update_callback = update_callback
+
+    def __set__(self, value):
+        self.value = value
+        self.has_changed = True
+
+    def __get__(self):
+        return self.value
+
+    def update(self):
+        self.update_callback(self.value)
+        self.has_changed = False
+
+    def __str__(self):
+        return '{}: {}, has_change: {}'.format(
+            self.name, self.value, self.has_changed)
+
+    def __repr__(self):
+        return(str(self))
+
+
+class Image(StorageObject):
     """
     A group of subjects which are uploaded to Panoptes as a single Image
     """
 
-    def __init__(self, image_id, group_id,
-                 cluster, subjects, metadata, zoo_id=None, image_meta=None):
-        self.image_id = image_id
-        self.group_id = group_id
-        self.cluster = cluster
-        self.subjects = subjects
-        self.metadata = metadata
-        self.zoo_id = zoo_id
+    def __init__(self, image_id, database, group_id,
+                 cluster, metadata, zoo_id=None, image_meta=None):
 
+        super().__init__(database)
+
+        with self.database.conn as conn:
+            image_data = self.datbase.Image.get_image(image_id)
+
+        self.image_id = image_id
+
+        self.group_id = StorageAttribute(
+            'group_id', image_data['group_id'], self.load_groupid)
+
+
+
+        self._group_id = group_id
+        self._cluster = cluster
+        self._metadata = metadata
+        self._zoo_id = zoo_id
         self.image_meta = image_meta
-        
+
+        self._subjects = None
+
+    def load(self):
+        self._load_subjects()
+
+    @property
+    def group_id(self):
+        return self._group_id.value
+
+    @group_id.setter
+    def group_id(self, group_id):
+        self._group_id.set(group_id)
+
+    @property
+    def subjects(self):
+        if self._subjects is None:
+            self._load_subjects()
+        return self._subjects
+
+    def _load_subjects(self):
+        with self.conn as conn:
+            subjects = self.database.Image \
+                .get_image_subjects(conn, self.image_id)
+            self._subjects = list(subjects)
+
     def __str__(self):
-        return 'id {} group {} cluster {} subjects {} ' \
+        return 'id {} group {} cluster {} ' \
                'metadata {} zooid {} image_meta {}'.format(
-            self.image_id, self.group_id, self.cluster, len(self.subjects),
-            str(self.metadata), self.zoo_id, self.image_meta)
+                    self.image_id, self.group_id, self.cluster,
+                    str(self.metadata), self.zoo_id, self.image_meta)
 
     def __repr__(self):
         return str(self)
@@ -160,9 +232,9 @@ class Image:
             return str(self.__dict__)
 
 
-class ImageGroup:
+class ImageGroup(StorageObject):
 
-    def __init__(self, group_id, cluster_name, images, **kwargs):
+    def __init__(self, database, group_id, cluster_name, images, **kwargs):
         """
         
         Parameters:
