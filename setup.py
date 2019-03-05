@@ -46,6 +46,8 @@ setup(
         'click',
         'tqdm',
         'astropy',
+        'pillow',
+        'sqlite3',
     ],
     extras_require={
         'clustering': ['dec-keras', 'redec-keras']
