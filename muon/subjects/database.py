@@ -280,14 +280,13 @@ class Database:
             cursor = conn.execute('SELECT subject_id FROM subjects')
             return [row[0] for row in cursor]
 
-
         @classmethod
         def set_subject_split(cls, conn, subject_id, split_name):
             split_id = cls._splits[split_name]
-            cursor = conn.execute("""
+            conn.execute("""
                 UPDATE subjects SET split_id=?
                 WHERE subject_id=?""", (split_id, subject_id)
-            )
+                )
 
         @classmethod
         def get_split_subjects(cls, conn, split_name):
@@ -424,6 +423,22 @@ class Database:
             return image.image_id
 
         @classmethod
+        def update_image(cls, conn, image_id, updates):
+            query_args = []
+            args = []
+            for k in updates:
+                query_args.append('{}=?'.format(k))
+                args.append(updates[k])
+            query = """
+                UPDATE images
+                SET {}
+                WHERE image_id=?
+                """.format(','.join(query_args))
+
+            args.append(image_id)
+            conn.execute(query, args)
+
+        @classmethod
         def update_zooid(cls, conn, image):
             conn.execute("""
                 UPDATE images 
@@ -455,35 +470,36 @@ class Database:
 
         @classmethod
         def get_image(cls, conn, image_id):
-            cursor = conn.execute("""
-                SELECT image_id, group_id, cluster, metadata, zoo_id,
-                       fig_dpi, fig_offset, fig_height, fig_width,
-                       fig_rows, fig_cols
-                FROM images WHERE image_id=?""", (image_id,))
-            image = cursor.fetchone()
+            fields = [
+                'group_id',
+                'cluster',
+                'metadata',
+                'zoo_id',
+                'fig_dpi',
+                'fig_offset',
+                'fig_height',
+                'fig_width',
+                'fig_rows',
+                'fig_cols'
+                ]
 
             cursor = conn.execute("""
-                SELECT subject_id FROM image_subjects 
-                WHERE image_id=?
-                ORDER BY image_index ASC""", (image_id,))
-            subjects = [row[0] for row in cursor]
+                SELECT {}
+                FROM images WHERE image_id=?""".format(','.join(fields)),
+                (image_id,))
+            row = cursor.fetchone()
+            row = {fields[i]: v for i, v in enumerate(row)}
 
-            image_meta = Image.ImageMeta(
-                dpi=image[5],
-                offset=image[6],
-                height=image[7],
-                width=image[8],
-                rows=image[9],
-                cols=image[10])
+            image_attrs = {}
+            fig_attrs = {}
+            for field in fields:
+                if 'fig_' in field:
+                    fig_attrs[field[4:]] = row[field]
+                else:
+                    image_attrs[field] = row[field]
 
-            return Image(
-                image_id=image[0],
-                group_id=image[1],
-                cluster=image[2],
-                metadata=json.loads(image[3]),
-                zoo_id=image[4],
-                subjects=subjects,
-                image_meta=image_meta)
+            image_attrs['image_meta'] = fig_attrs
+            return image_attrs
 
         @classmethod
         def get_group_images(cls, conn, group_id):

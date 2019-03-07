@@ -20,30 +20,46 @@ class StorageObject:
 
     def __init__(self, database):
         self.database = database
+        self.storage = {}
 
     @property
     def conn(self):
         return self.database.conn
 
+    def update(self):
+        with self.conn as conn:
+            pass
+
 
 class StorageAttribute:
 
-    def __init__(self, name, value, update_callback):
+    def __init__(self, name):
+        self.name = name
+
+    def __set__(self, instance, value):
+        obj = instance.storage[self.name]
+        obj.set(value)
+
+        if instance.online:
+            instance.save()
+
+    def __get__(self, instance, owner):
+        return instance.storage[self.name].get()
+
+
+class StoredAttribute:
+
+    def __init__(self, name, value):
         self.name = name
         self.value = value
         self.has_changed = False
-        self.update_callback = update_callback
 
-    def __set__(self, value):
-        self.value = value
-        self.has_changed = True
-
-    def __get__(self):
+    def get(self):
         return self.value
 
-    def update(self):
-        self.update_callback(self.value)
-        self.has_changed = False
+    def set(self, value):
+        self.value = value
+        self.has_changed = True
 
     def __str__(self):
         return '{}: {}, has_change: {}'.format(
@@ -53,56 +69,144 @@ class StorageAttribute:
         return(str(self))
 
 
+class LazyLoader:
+
+    def __init__(self):
+        self.items = {}
+
+    def __getitem__(self, id_):
+        if id not in self.items:
+            self.items[id_] = self._load_item(id_)
+
+    def _load_item(self, id_):
+        pass
+
+
+class SubjectLoader(StoredAttribute):
+
+    def __init__(self, name, image_id, database, subjects=None):
+        super().__init__(name, subjects)
+
+        self.image_id = image_id
+        self.database = database
+
+    def get(self):
+        if self.value is None:
+            self.value = self._load()
+        return self.value
+
+    def _load(self):
+        # TODO load subjects from database
+        with self.database.conn as conn:
+            subjects = self.database.Image \
+                .get_image_subjects(conn, self.image_id)
+            return list(subjects)
+
+
+class ImageLoader:
+
+    def __init__(self, group_id, database):
+        self.database = database
+        self.group_id = group_id
+        self._loaded_images = []
+        self._images = {}
+
+    def __getitem__(self, image_id):
+        if image_id not in self._images:
+            image = self._load_image(image_id)
+            if image is None:
+                raise KeyError('No image {} in group {}'.format(
+                    image_id, self.group_id))
+
+            self._images[image_id] = image
+            self._loaded_images.append(image_id)
+
+            if len(self._images) > 1000:
+                del self._images[self._loaded_images.pop(0)]
+        return self._images[image_id]
+
+    def __iter__(self):
+        with self.database.conn as conn:
+            for image_id in self.database.Image \
+                    .get_group_images(conn, self.group_id):
+                yield self._load_image(image_id)
+
+    def _load_image(self, image_id):
+        with self.database.conn as conn:
+            image = None
+            # TODO
+            return image
+
+
 class Image(StorageObject):
     """
     A group of subjects which are uploaded to Panoptes as a single Image
     """
 
-    def __init__(self, image_id, database, group_id,
-                 cluster, metadata, zoo_id=None, image_meta=None):
+    cluster = StorageAttribute('cluster')
+    metadata = StorageAttribute('metadata')
+    image_meta = StorageAttribute('image_meta')
+    zoo_id = StorageAttribute('zoo_id')
+    subjects = StorageAttribute('subjects')
 
+    def __init__(self, image_id, database, attrs=None, online=False):
         super().__init__(database)
-
-        with self.database.conn as conn:
-            image_data = self.datbase.Image.get_image(image_id)
-
         self.image_id = image_id
+        self.online = online
 
-        self.group_id = StorageAttribute(
-            'group_id', image_data['group_id'], self.load_groupid)
+        if attrs is None:
+            with self.conn as conn:
+                # TODO need to change database method
+                attrs = database.Image.get_image(conn, image_id)
+        subjects = attrs.get('subjects')
+        if attrs['image_meta']:
+            image_meta = self.ImageMeta(**attrs['image_meta'])
+        else:
+            image_meta = None
 
+        self.group_id = attrs['group_id']
 
+        storage = [
+            StoredAttribute('cluster', attrs['cluster']),
+            StoredAttribute('metadata', attrs['metadata']),
+            StoredAttribute('zoo_id', attrs['zoo_id']),
+            StoredAttribute('image_meta', image_meta),
+            SubjectLoader('subjects', image_id, database, subjects=subjects)]
+        self.storage = {s.name: s for s in storage}
 
-        self._group_id = group_id
-        self._cluster = cluster
-        self._metadata = metadata
-        self._zoo_id = zoo_id
-        self.image_meta = image_meta
+    @classmethod
+    def new(cls, image_id, database, group_id, cluster, metadata, subjects,
+            zoo_id=None, image_meta=None):
+        attrs = {
+            'group_id': group_id,
+            'cluster': cluster,
+            'metadata': metadata,
+            'subjects': subjects,
+            'zoo_id': zoo_id,
+            'image_meta': image_meta
+        }
 
-        self._subjects = None
+        image = cls(image_id, database, attrs)
+        with database.conn as conn:
+            database.Image.add_image(conn, image)
+            conn.commit()
 
-    def load(self):
-        self._load_subjects()
+        return image
 
-    @property
-    def group_id(self):
-        return self._group_id.value
+    def save(self):
+        updates = {}
+        for k, v in self.storage.items():
+            if v.has_changed:
+                if k == 'image_meta':
+                    updates.update(v.value.dump_db())
+                else:
+                    updates[k] = v.value
+                v.has_changed = False
 
-    @group_id.setter
-    def group_id(self, group_id):
-        self._group_id.set(group_id)
-
-    @property
-    def subjects(self):
-        if self._subjects is None:
-            self._load_subjects()
-        return self._subjects
-
-    def _load_subjects(self):
-        with self.conn as conn:
-            subjects = self.database.Image \
-                .get_image_subjects(conn, self.image_id)
-            self._subjects = list(subjects)
+        if updates:
+            with self.conn as conn:
+                self.database.Image.update_image(conn, self.image_id, updates)
+                conn.commit()
 
     def __str__(self):
         return 'id {} group {} cluster {} ' \
@@ -228,6 +332,15 @@ class Image(StorageObject):
             self.rows = rows
             self.cols = cols
 
+        def dump_db(self):
+            return {
+                'fig_dpi': self.dpi,
+                'fig_offset': self.offset,
+                'fig_height': self.height,
+                'fig_width': self.width,
+                'fig_rows': self.rows,
+                'fig_cols': self.cols
+            }
         def __str__(self):
             return str(self.__dict__)
 
@@ -235,6 +348,7 @@ class Image(StorageObject):
 class ImageGroup(StorageObject):
 
     def __init__(self, database, group_id, cluster_name, images, **kwargs):
+    # def __init__(self, group_id, database, attrs=None):
         """
         
         Parameters:
