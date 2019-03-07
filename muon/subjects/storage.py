@@ -47,7 +47,7 @@ class Storage:
         existing_id = self.database.Subject \
             .get_source_subject(conn, subject.source_id)
 
-        if not existing_id:
+        if existing_id:
             logger.info('Subject ({}, {}) already in database, skipping'
                 .format(existing_id, subject.source_id))
             return existing_id
