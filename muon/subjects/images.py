@@ -69,19 +69,6 @@ class StoredAttribute:
         return(str(self))
 
 
-class LazyLoader:
-
-    def __init__(self):
-        self.items = {}
-
-    def __getitem__(self, id_):
-        if id not in self.items:
-            self.items[id_] = self._load_item(id_)
-
-    def _load_item(self, id_):
-        pass
-
-
 class SubjectLoader(StoredAttribute):
 
     def __init__(self, name, image_id, database, subjects=None):
@@ -347,7 +334,7 @@ class Image(StorageObject):
 
 class ImageGroup(StorageObject):
 
-    def __init__(self, database, group_id, cluster_name, images, **kwargs):
+    def __init__(self, group_id, database, group_id, attrs):
     # def __init__(self, group_id, database, attrs=None):
         """
         
@@ -362,16 +349,35 @@ class ImageGroup(StorageObject):
         """
 
         self.group_id = group_id
-        self.cluster_name = cluster_name
-        self.image_size = kwargs.get('image_size', 36)
-        self.image_width = kwargs.get('image_width', 6)
-        self.description = kwargs.get('description', None)
-        self.permutations = kwargs.get('permutations', 1)
 
-        self.images = images or {}
-        self.zoo_map = None
+        if attrs is None:
+            with self.conn as conn:
+                # TODO need to change database method
+                attrs = database.ImageGroup.get_group(conn, group_id)
+        self.image_size = attrs['image_size']
+        self.image_width = attrs['image_width']
+        self.description = attrs['description']
+        self.permutations = attrs['permutations']
+        self.cluster_name = attrs['cluster_name']
+        self.image_count = attrs['image_count']
+
+        self.images = ImageLoader(group_id, database)
+
+        # self.cluster_name = cluster_name
+
+
+
+
+        # self.image_size = kwargs.get('image_size', 36)
+        # self.image_width = kwargs.get('image_width', 6)
+        # self.description = kwargs.get('description', None)
+        # self.permutations = kwargs.get('permutations', 1)
+
+        # self.images = images or {}
+        # self.zoo_map = None
 
     @classmethod
+    def new(cls, group_id, database, cluster_name, **kwargs):
     def new(cls, group_id, next_id,
             subject_storage, cluster_name, cluster_assignments, **kwargs):
         """
