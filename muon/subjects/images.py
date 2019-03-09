@@ -163,7 +163,7 @@ class Image(StorageObject):
 
     @classmethod
     def new(cls, image_id, database, group_id, cluster, metadata, subjects,
-            zoo_id=None, image_meta=None):
+            zoo_id=None, image_meta=None, commit=True):
         attrs = {
             'group_id': group_id,
             'cluster': cluster,
@@ -174,9 +174,10 @@ class Image(StorageObject):
         }
 
         image = cls(image_id, database, attrs)
-        with database.conn as conn:
-            database.Image.add_image(conn, image)
-            conn.commit()
+        if commit:
+            with database.conn as conn:
+                database.Image.add_image(conn, image)
+                conn.commit()
 
         return image
 
@@ -334,7 +335,7 @@ class Image(StorageObject):
 
 class ImageGroup(StorageObject):
 
-    def __init__(self, group_id, database, group_id, attrs):
+    def __init__(self, group_id, database, attrs):
     # def __init__(self, group_id, database, attrs=None):
         """
         
@@ -359,6 +360,7 @@ class ImageGroup(StorageObject):
         self.description = attrs['description']
         self.permutations = attrs['permutations']
         self.cluster_name = attrs['cluster_name']
+        # TODO
         self.image_count = attrs['image_count']
 
         self.images = ImageLoader(group_id, database)
@@ -377,69 +379,55 @@ class ImageGroup(StorageObject):
         # self.zoo_map = None
 
     @classmethod
-    def new(cls, group_id, database, cluster_name, **kwargs):
-    def new(cls, group_id, next_id,
-            subject_storage, cluster_name, cluster_assignments, **kwargs):
+    def new(cls, group_id, database, cluster_assignments, **kwargs):
+    # def new(cls, group_id, next_id,
+            # subject_storage, cluster_name, cluster_assignments, **kwargs):
         """
         Parameters:
             next_id: callback function to get next image id
             cluster_assignments: {cluster: [subject_id]}
         """
-        self = cls(group_id, None, **kwargs)
-        images = self.create_images(
-            group_id, next_id, subject_storage, cluster_assignments)
-        self.images = images
-        return self
 
-        # images = {}
-        # i = next_id
-        # for c in cluster_assignments:
-            # cluster_subjects = subjects.subset(cluster_assignments[c])
-            # split_cluster = self.split_subjects(cluster_subjects)
-            
-            # for image_subjects in split_cluster:
-                # meta = {'cluster': c}
-                # images[i] = Image(i, self.group, image_subjects, meta)
-                # i += 1
+        attrs = {
+            'image_size': kwargs.get('image_size', 36),
+            'image_width': kwargs.get('image_width', 6),
+            'description': kwargs.get('description', None),
+            'permutations': kwargs.get('permutations', 1)
+        }
 
-        # self.images = images
-        # return i, self
+        self = cls(group_id, database, attrs)
+        self.create_images(cluster_assignments)
 
-    def create_images(
-            self, group_id, next_id, subject_storage, cluster_assignments):
+    def create_images(self, cluster_assignments):
         """
         Parameters:
             next_id: next id for a new image
             subjects
             cluster_assignments: {cluster: [subject_id]}
         """
-        images = {}
+
+        with self.conn as conn:
+            _next_id = self.database.Image.next_id(conn)
+
+        def next_id():
+            _next_id += 1
+            return _next_id - 1
+
         for cluster in cluster_assignments:
-            meta = {}
-            cluster_subjects = subject_storage.get_subjects(
-                cluster_assignments[cluster])
-            print(cluster, cluster_subjects)
-            # self.add_subjects(cluster, cluster_subjects, meta)
-            
-            for image_subjects in self.split_subjects(cluster_subjects):
-                image_id = next_id()
-                images[image_id] = Image(
-                    image_id=image_id,
-                    group_id=group_id,
-                    cluster=cluster,
-                    subjects=image_subjects,
-                    metadata=meta)
-        return images
+            cluster_subjects = cluster_assignments[cluster]
+            attrs = {
+                'group_id': self.group_id,
+                'cluster': cluster,
+                'metadata': {},
+                'commit': False
+            }
 
-
-    # def create_subjects(self, cluster, subjects, meta):
-        # for image_subjects in self.split_subjects(subjects):
-            # id_ = next_id()
-            # if id_ in self.images:
-                # raise KeyError('image id {} already exists in group {}' \
-                    # .format(id_, self.group_id))
-            # self.images[id_] = Image(
-                # id_, self.group_id, cluster, image_subjects, meta)
+            with self.database.conn as conn:
+                for image_subjects in self.split_subjects(cluster_subjects):
+                    image = Image.new(next_id(), database(),
+                                      subjects=image_subjects, **attrs)
+                    self.database.Image.add_image(conn, image)
+                conn.commit()
 
     def metadata(self):
         return {
@@ -476,36 +464,37 @@ class ImageGroup(StorageObject):
     def list(self):
         return list(self.iter())
 
-    def split_subjects(self, subjects):
+    def split_subjects(self, subject_ids):
         """
         Subdivide a list of subjects into image groups, each of size
         determined in constructor call.
         """
         images = []
+        subject_ids = subject_ids.copy()
 
         for _ in range(self.permutations):
-            keys = subjects.keys()
-            random.shuffle(keys)
+            random.shuffle(subject_ids)
 
             # Sometimes the number of subjects in a cluster cannot be evenly
             # split into N even sized images. In this case we add enough
             # duplicate subjects to the last image to make it the same size
-            if len(keys) % self.image_size > 0:
-                print(len(keys), self.image_size, len(keys) % self.image_size,
-                        self.image_size - (len(keys) % self.image_size))
+            if len(subject_ids) % self.image_size > 0:
+                l = len(subject_ids)
+                logger.debug('{}/36={:d}+{}'.format(
+                    l, l/self.image_size, l%self.image_size))
+                diff = self.image_size - (len(subject_ids) % self.image_size)
+                logger.debug('adding {}'.format(diff))
 
-                diff = self.image_size - (len(keys) % self.image_size)
-                print(len(keys), self.image_size, len(keys) % self.image_size,
-                        diff)
-                keys += random.sample(keys, diff)
+                subject_ids += random.sample(subject_ids, diff)
 
-            length = len(keys)
-            print(length)
+            length = len(subject_ids)
+            logger.debug('{} subjects, {} images'.format(
+                length, length/self.image_size))
             w = math.ceil(length/self.image_size)
             for n in range(w):
                 a = n*self.image_size
                 b = min(length, a+self.image_size)
-                subset = keys[a:b]
+                subset = subject_ids[a:b]
 
                 images.append(subset)
         return images
