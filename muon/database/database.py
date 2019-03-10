@@ -122,7 +122,6 @@ class Database:
                 CREATE TABLE IF NOT EXISTS sources (
                     source_id TEXT PRIMARY KEY,
                     hash TEXT NOT NULL,
-                    location TEXT NOT NULL,
                     updated TEXT NOT NULL
                 );
             """
@@ -554,11 +553,6 @@ class Database:
                 'image_width',
                 'description',
                 'permutations']
-            # cursor = conn.execute("""
-                # SELECT group_id, cluster_name, image_size, image_width,
-                # description, permutations FROM image_groups WHERE group_id=?""",
-                # (group_id,))
-            # group = cursor.fetchone()
 
             cursor = conn.execute("""
                 SELECT {}
@@ -585,7 +579,6 @@ class Database:
             data = {
                 'source_id': source.source_id,
                 'hash': source.hash,
-                'location': source.fname,
                 'updated': source.updated,
             }
 
@@ -597,14 +590,38 @@ class Database:
 
         @classmethod
         def get_source(cls, conn, source_id):
-            cursor = conn.execute("""
-                SELECT source_id, hash, location, updated
-                FROM sources
-                WHERE source_id=?""", (source_id))
+            fields = ['hash', 'updated']
 
+            cursor = conn.execute("""
+                SELECT {}
+                FROM sources WHERE source_id=?""".format(','.join(fields)),
+                (source_id,))
             row = cursor.fetchone()
-            fields = ['source_id', 'hash', 'location', 'updated']
-            return Source(**{k: row[i] for i, k in enumerate(fields)})
+            row = {fields[i]: v for i, v in enumerate(row)}
+            return row
+
+        @classmethod
+        def source_exists(cls, conn, source_id):
+            cursor = conn.execute("""
+                SELECT source_id FROM sources
+                WHERE source_id=?""", (source_id,))
+            return cursor.fetchone() is not None
+
+        @classmethod
+        def update_source(cls, conn, source_id, updates):
+            query_args = []
+            args = []
+            for k in updates:
+                query_args.append('{}=?'.format(k))
+                args.append(updates[k])
+            query = """
+                UPDATE sources
+                SET {}
+                WHERE source_id=?
+                """.format(','.join(query_args))
+
+            args.append(source_id)
+            conn.execute(query, args)
 
 
 
