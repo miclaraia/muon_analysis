@@ -32,14 +32,13 @@ def main(database_file, image_path):
     ids = [9, 10, 11, 12, 13]
 
     database = Database(database_file)
-    image_storage = ImageStorage(database)
 
     # new_group = image_storage.get_group(100)
     # with database.conn as conn:
         # database.ImageGroup.delete_group(conn, 100)
         # conn.commit()
 
-    image_group = image_storage.get_group(0)
+    image_group = ImageGroup(0, database)
     image_group.images = {i: image_group.images[i] for i in ids}
     image_group.upload_subjects(image_path)
 

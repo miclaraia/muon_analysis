@@ -61,6 +61,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS image_groups (
                     group_id integer PRIMARY KEY,
                     cluster_name TEXT NOT NULL,
+                    image_count integer,
                     image_size integer,
                     image_width integer,
                     description text,
@@ -540,6 +541,7 @@ class Database:
 
             data = {
                 'group_id': group.group_id,
+                'image_count': group.image_count,
                 'cluster_name': group.cluster_name,
                 'image_size': group.image_size,
                 'image_width': group.image_width,
@@ -555,26 +557,57 @@ class Database:
             return group.group_id
 
         @classmethod
+        def update_group(cls, conn, group_id, updates):
+            query_args = []
+            args = []
+            for k in updates:
+                query_args.append('{}=?'.format(k))
+                args.append(updates[k])
+            query = """
+                UPDATE image_groups
+                SET {}
+                WHERE group_id=?
+                """.format(','.join(query_args))
+
+            args.append(group_id)
+            conn.execute(query, args)
+
+        @classmethod
         def list_groups(cls, conn):
             cursor = conn.execute('SELECT group_id FROM image_groups')
             return [row[0] for row in cursor]
 
         @classmethod
         def get_group(cls, conn, group_id):
-            cursor = conn.execute("""
-                SELECT group_id, cluster_name, image_size, image_width,
-                description, permutations FROM image_groups WHERE group_id=?""",
-                (group_id,))
-            group = cursor.fetchone()
+            fields = [
+                'image_count',
+                'cluster_name',
+                'image_size',
+                'image_width',
+                'description',
+                'permutations']
+            # cursor = conn.execute("""
+                # SELECT group_id, cluster_name, image_size, image_width,
+                # description, permutations FROM image_groups WHERE group_id=?""",
+                # (group_id,))
+            # group = cursor.fetchone()
 
-            return ImageGroup(
-                group_id=group[0],
-                cluster_name=group[1],
-                image_size=group[2],
-                image_width=group[3],
-                description=group[4],
-                permutations=group[5],
-                images=None)
+            cursor = conn.execute("""
+                SELECT {}
+                FROM image_groups WHERE group_id=?""".format(','.join(fields)),
+                (group_id,))
+            row = cursor.fetchone()
+            row = {fields[i]: v for i, v in enumerate(row)}
+            return row
+
+            # return ImageGroup(
+                # group_id=group[0],
+                # cluster_name=group[1],
+                # image_size=group[2],
+                # image_width=group[3],
+                # description=group[4],
+                # permutations=group[5],
+                # images=None)
 
 
     class Source:

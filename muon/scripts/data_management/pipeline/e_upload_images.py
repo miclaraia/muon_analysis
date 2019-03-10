@@ -7,7 +7,7 @@ import csv
 import json
 
 from muon.subjects.database import Database
-from muon.subjects.images import ImageStorage, ImageGroup
+from muon.subjects.images import ImageGroup
 import muon.project.panoptes as pan
 
 logging.basicConfig(level=logging.DEBUG)
@@ -23,7 +23,6 @@ logging.warn('%s', logger.level)
 @click.option('--groups', required=True)
 def main(database_file, image_path, subject_export, groups):
     database = Database(database_file)
-    image_storage = ImageStorage(database)
     pan.Uploader.client()
 
     if subject_export:
@@ -44,12 +43,10 @@ def main(database_file, image_path, subject_export, groups):
 
     for group in [int(g) for g in groups.split(',')]:
         logger.info('Group %d', group)
-        image_group = image_storage.get_group(group)
+        image_group = ImageGroup(group_id, database)
 
-        for image in tqdm(image_group.upload_subjects(
-                image_path, existing_subjects=existing_subjects)):
-            logger.info('image %s', str(image))
-            image_storage.update_image_zooid(image)
+        image_group.upload_subjects(
+            image_path, existing_subjects=existing_subjects)
 
 
 if __name__ == '__main__':
