@@ -5,8 +5,6 @@ import json
 from tqdm import tqdm
 
 from muon.subjects.subject import Subject
-from muon.subjects.images import Image, ImageGroup
-
 
 
 class Database:
@@ -438,36 +436,6 @@ class Database:
 
             args.append(image_id)
             conn.execute(query, args)
-
-        @classmethod
-        def update_zooid(cls, conn, image):
-            conn.execute("""
-                UPDATE images 
-                SET zoo_id=?
-                WHERE image_id=?""", (image.zoo_id, image.image_id))
-
-        @classmethod
-        def update_figure(cls, conn, image):
-            args = (json.dumps(image.metadata),
-                    image.image_meta.dpi,
-                    image.image_meta.offset,
-                    image.image_meta.height,
-                    image.image_meta.width,
-                    image.image_meta.rows,
-                    image.image_meta.cols,
-                    image.image_id)
-            conn.execute("""
-                UPDATE images
-                SET
-                    metadata=?,
-                    fig_dpi=?,
-                    fig_offset=?,
-                    fig_height=?,
-                    fig_width=?,
-                    fig_rows=?,
-                    fig_cols=?
-                WHERE image_id=?""", args)
-            
 
         @classmethod
         def get_image(cls, conn, image_id):

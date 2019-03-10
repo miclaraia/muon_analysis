@@ -6,8 +6,8 @@ from tqdm import tqdm
 import csv
 import json
 
-from muon.subjects.database import Database
-from muon.subjects.images import ImageGroup
+from muon.database.database import Database
+from muon.images.image_group import ImageGroup
 import muon.project.panoptes as pan
 
 logging.basicConfig(level=logging.DEBUG)

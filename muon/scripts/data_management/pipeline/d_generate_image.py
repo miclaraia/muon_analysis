@@ -3,8 +3,8 @@ import click
 from tqdm import tqdm
 
 from muon.subjects.storage import Storage
-from muon.subjects.database import Database
-from muon.subjects.images import ImageGroup
+from muon.database.database import Database
+from muon.images.image_group import ImageGroup
 
 
 @click.group(invoke_without_command=True)

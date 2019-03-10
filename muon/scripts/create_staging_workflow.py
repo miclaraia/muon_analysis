@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from muon.subjects.database import Database
-from muon.subjects.images import ImageStorage, ImageGroup
+from muon.database.database import Database
+from muon.images.image_group import ImageGroup
 import muon.project.panoptes as pan
 import muon.config
 

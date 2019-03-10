@@ -4,7 +4,7 @@ from tqdm import tqdm
 from muon.subjects.storage import Storage
 from muon.subjects.subjects import Subject
 from muon.subjects.parsing import ParseFits
-from muon.subjects.database import Database
+from muon.database.database import Database
 
 
 @click.group(invoke_without_command=True)

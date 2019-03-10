@@ -2,7 +2,7 @@ import click
 import pandas
 import numpy as np
 
-from muon.subjects.database import Database
+from muon.database.database import Database
 from muon.project.clustering import Clustering
 from muon.subjects.storage import Storage
 

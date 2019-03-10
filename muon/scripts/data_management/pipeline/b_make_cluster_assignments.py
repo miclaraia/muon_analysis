@@ -9,7 +9,7 @@ from tqdm import tqdm
 @click.option('--batches')
 def main(save_dir, database_file, batches):
     from muon.subjects.storage import Storage
-    from muon.subjects.database import Database
+    from muon.database.database import Database
     from muon.project.clustering import Clustering
 
     from redec_keras.models.decv2 import Config
