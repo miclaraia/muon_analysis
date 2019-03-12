@@ -122,7 +122,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS sources (
                     source_id TEXT PRIMARY KEY,
                     hash TEXT NOT NULL,
-                    updated TEXT NOT NULL
+                    updated TIMESTAMP NOT NULL
                 );
             """
             print(query)

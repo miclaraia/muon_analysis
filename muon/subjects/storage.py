@@ -79,7 +79,7 @@ class Storage:
 
         if label_name and subject.y is not None:
             self.database.Subject \
-                .add_subject_label(subject.id, label_name, subject.y)
+                .add_subject_label(conn, subject.id, label_name, subject.y)
 
         return subject.id
 

@@ -2,6 +2,7 @@ import click
 from tqdm import tqdm
 import os
 import logging
+import csv
 
 from muon.subjects.storage import Storage
 from muon.subjects.subjects import Subject
@@ -12,21 +13,7 @@ from muon.subjects.source import Source
 logger = logging.getLogger(__name__)
 
 
-@click.group(invoke_without_command=True)
-@click.argument('input_file')
-@click.argument('database_file')
-@click.option('--batch', nargs=1, type=int)
-def main(input_file, database_file, batch):
-    database = Database(database_file)
-    storage = Storage(database)
-
-    parser = ParseFits.parse_file(input_file)
-
-    subjects = []
-    def wrapper():
-        for subject in parser:
-            subjects.append(subject)
-            yield subject
+def add_file(input_file, storage, database, batch):
 
     location, source_id = os.path.split(input_file)
     with database.conn as conn:
@@ -39,19 +26,61 @@ def main(input_file, database_file, batch):
                 logger.info('Nothing to do, hashes match')
                 return
             else:
-                source.update_hash(location)
+                source.hash == None
+                source.save()
         else:
             logger.info('Creating new source')
             source = Source.new(source_id, database, location)
 
-    if batch:
-        storage.add_subjects(wrapper(), batch)
-    else:
-        storage.add_batch(wrapper())
+    parser = ParseFits.parse_file(input_file)
 
-    subject_labels = [(subject.id, subject.y) for subject in subjects]
-    storage.add_labels('vegas', subject_labels)
+    if batch:
+        storage.add_subjects(parser, batch, 'vegas')
+    else:
+        storage.add_batch(parser, 'vegas')
+
+    source.update_hash(location)
+    source.save()
+
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.argument('manifest')
+@click.argument('database_file')
+@click.option('--batch', nargs=1, type=int)
+def one(input_file, database_file, batch):
+    database = Database(database_file)
+    storage = Storage(database)
+
+    add_file(input_file, storage, database, batch)
+
+
+@cli.command()
+@click.argument('manifest')
+@click.argument('database_file')
+def manifest(manifest, database_file):
+    database = Database(database_file)
+    storage = Storage(database)
+
+    path = os.path.dirname(manifest)
+
+    with open(manifest, 'r') as file:
+        for row in csv.DictReader(file):
+            if int(row['active']):
+                batch = int(row['batch'])
+                if batch == -1:
+                    continue
+
+                fname = os.path.join(path, row['name'])
+                print(batch, fname)
+
+                add_file(fname, storage, database, batch)
+
 
 
 if __name__ == '__main__':
-    main()
+    cli()

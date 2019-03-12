@@ -49,7 +49,7 @@ class Source(StorageObject):
         for k, v in self.storage.items():
             if v.has_changed:
                 if k == 'hash':
-                    updates['hash'] = v.value[0]
+                    updates['hash'] = v.value
                     updates['updated'] = datetime.now()
                 else:
                     updates[k] = v.value
@@ -57,7 +57,8 @@ class Source(StorageObject):
 
         if updates:
             with self.conn as conn:
-                self.database.Image.update_image(conn, self.source_id, updates)
+                self.database.Source \
+                    .update_source(conn, self.source_id, updates)
                 conn.commit()
 
     def update_hash(self, location):
@@ -76,6 +77,13 @@ class Source(StorageObject):
 
     def compare(self, location):
         return self._get_hash(location, self.source_id) == self.hash
+
+    def __str__(self):
+        return '{} {} {}'.format(self.source_id, self.hash, self.updated)
+
+    def __repr__(self):
+        return str(self)
+
 
     # @property
     # def hash(self):
