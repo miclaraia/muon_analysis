@@ -129,35 +129,41 @@ class Image(StorageObject):
         # Touch the file
         # so other concurrent image generation processes
         # skip this image
-        open(fname, 'w')
 
-        if quality is None:
-            quality = 95
+        try:
+            open(fname, 'w').close()
 
-        # subjects = subject_storage.get_subjects(self.subjects)
-        subjects = []
-        keys = set()
-        for s in self.subjects:
-            subject = subject_storage.get_subject(s)
-            if subject.id in keys:
-                subject.id = subject.id+'-duplicate'
-            keys.add(subject.id)
-            subjects.append(subject)
+            if quality is None:
+                quality = 95
 
-        offset = .5
-        dpi = dpi or 50
-        fig, meta = Subjects(subjects).plot_subjects(
-            w=width, grid=True, grid_args={'offset': offset}, meta=True)
+            # subjects = subject_storage.get_subjects(self.subjects)
+            subjects = []
+            keys = set()
+            for s in self.subjects:
+                subject = subject_storage.get_subject(s)
+                if subject.id in keys:
+                    subject.id = subject.id+'-duplicate'
+                keys.add(subject.id)
+                subjects.append(subject)
+
+            offset = .5
+            dpi = dpi or 50
+            fig, meta = Subjects(subjects).plot_subjects(
+                w=width, grid=True, grid_args={'offset': offset}, meta=True)
 
 
-        self.image_meta = Image.ImageMeta(dpi=dpi, offset=offset, **meta)
-        # TODO make sure to actually update this data in the db
-        # Probably need to add new columns
+            self.image_meta = Image.ImageMeta(dpi=dpi, offset=offset, **meta)
+            # TODO make sure to actually update this data in the db
+            # Probably need to add new columns
 
-        fig.savefig(fname, dpi=dpi, quality=quality)
+            fig.savefig(fname, dpi=dpi, quality=quality)
 
-        plt.close(fig)
-        return True
+            plt.close(fig)
+            return True
+
+        except Exception:
+            os.remove(fname)
+            raise
 
     def at_location(self, x, y):
         """
@@ -244,6 +250,7 @@ class SubjectLoader(StoredAttribute):
     def _load(self):
         # TODO load subjects from database
         with self.database.conn as conn:
+            logger.debug('image %s getting subjects', self.image_id)
             subjects = self.database.Image \
                 .get_image_subjects(conn, self.image_id)
             return list(subjects)

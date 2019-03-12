@@ -82,6 +82,8 @@ class Database:
                     split_id INTEGER DEFAULT 0 -- which split group for training
                 );
                     CREATE INDEX IF NOT EXISTS subject_batch
+                        ON subjects (batch_id, subject_id);
+                    CREATE INDEX IF NOT EXISTS subject_batch_split
                         ON subjects (batch_id, split_id);
                     CREATE INDEX IF NOT EXISTS subject_split
                         ON subjects (split_id);

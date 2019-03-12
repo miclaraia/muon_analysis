@@ -122,10 +122,15 @@ class ImageGroup(StorageObject):
         with self.conn as conn:
             _next_id = self.database.Image.next_id(conn)
 
+        def f_next_id():
+            i = 0
+            while 1:
+                yield i + _next_id
+                i += 1
+        next_id_iter = f_next_id()
+
         def next_id():
-            nonlocal _next_id
-            _next_id += 1
-            return _next_id - 1
+            return next(next_id_iter)
 
         for cluster in cluster_assignments:
             cluster_subjects = cluster_assignments[cluster]
@@ -134,13 +139,13 @@ class ImageGroup(StorageObject):
                 'cluster': cluster,
                 'metadata': {},
                 'commit': False,
-                'image_id': next_id()
             }
 
             with self.database.conn as conn:
                 count = 0
                 for image_subjects in self.split_subjects(cluster_subjects):
                     image = Image.new(self.database,
+                                      image_id=next_id(),
                                       subjects=image_subjects, **attrs)
                     self.database.Image.add_image(conn, image)
                     count += 1
