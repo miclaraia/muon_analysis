@@ -62,8 +62,8 @@ class ImageGroup(StorageObject):
         # self.zoo_map = None
 
     @classmethod
-    def new(cls, group_id, database, cluster_name, cluster_assignments,
-            **kwargs):
+    def new(cls, database, cluster_name, cluster_assignments,
+            group_id=None, **kwargs):
     # def new(cls, group_id, next_id,
             # subject_storage, cluster_name, cluster_assignments, **kwargs):
         """
@@ -71,6 +71,10 @@ class ImageGroup(StorageObject):
             next_id: callback function to get next image id
             cluster_assignments: {cluster: [subject_id]}
         """
+
+        if group_id is None:
+            with database.conn as conn:
+                group_id = database.ImageGroup.next_id(conn)
 
         attrs = {
             'image_size': kwargs.get('image_size', 36),
@@ -129,13 +133,14 @@ class ImageGroup(StorageObject):
                 'group_id': self.group_id,
                 'cluster': cluster,
                 'metadata': {},
-                'commit': False
+                'commit': False,
+                'image_id': next_id()
             }
 
             with self.database.conn as conn:
                 count = 0
                 for image_subjects in self.split_subjects(cluster_subjects):
-                    image = Image.new(next_id(), self.database,
+                    image = Image.new(self.database,
                                       subjects=image_subjects, **attrs)
                     self.database.Image.add_image(conn, image)
                     count += 1

@@ -24,7 +24,6 @@ def main(database_file, cluster_name, batches):
     }
 
     with database.conn as conn:
-        group_id = database.ImageGroup.next_id(conn)
 
         for batch in [int(b) for b in batches.split(',')]:
             print('batch', batch)
@@ -36,8 +35,12 @@ def main(database_file, cluster_name, batches):
                 logger.warn('cluster_assignments: {}'.format(cluster_assignments))
                 raise Exception('Empty cluster assignment struct')
 
-    group = ImageGroup.new(group_id, database, cluster_name,
-                           cluster_assignments, **kwargs)
+            description = 'Batch {}'.format(batch)
+
+            group = ImageGroup.new(database, cluster_name,
+                                   cluster_assignments,
+                                   description=description,
+                                   **kwargs)
     print(group)
 
     with database.conn as conn:

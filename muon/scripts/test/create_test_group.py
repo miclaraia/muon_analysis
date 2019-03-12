@@ -18,14 +18,14 @@ def main(database):
         'image_size': 36,
         'image_width': 6,
         'permutations': 1,
+        'description': 'test',
     }
 
     with database.conn as conn:
-        group_id = database.ImageGroup.next_id(conn)
         subjects = database.Subject.list_subjects(conn)
 
     clusters = {0: subjects[:36*20]}
-    group = ImageGroup.new(group_id, database, 'test', clusters, **kwargs)
+    group = ImageGroup.new(database, 'test', clusters, **kwargs)
 
     print(group)
 

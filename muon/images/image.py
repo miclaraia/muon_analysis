@@ -47,8 +47,13 @@ class Image(StorageObject):
         self.storage = {s.name: s for s in storage}
 
     @classmethod
-    def new(cls, image_id, database, group_id, cluster, metadata, subjects,
-            zoo_id=None, image_meta=None, commit=True):
+    def new(cls, database, group_id, cluster, metadata, subjects,
+            image_id=None, zoo_id=None, image_meta=None, commit=True):
+
+        if image_id is None:
+            with database.conn as conn:
+                image_id = database.Image.next_id(conn)
+
         attrs = {
             'group_id': group_id,
             'cluster': cluster,
