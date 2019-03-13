@@ -18,8 +18,12 @@ def check(zoo_subjects, group, database, uploader, destructive):
     images = set()
     unlink = []
     set_zooid = 0
+
+    image_group = ImageGroup(group, database)
+    image_group.images.load_all()
     for zoo_id, image_id in tqdm(zoo_subjects):
-        image = Image(image_id, database, online=destructive)
+        # image = Image(image_id, database, online=destructive)
+        image = image_group.images[image_id]
         print(zoo_id, image_id, image.zoo_id)
 
         if image_id in images:
@@ -35,8 +39,8 @@ def check(zoo_subjects, group, database, uploader, destructive):
 
     reset_zooid = 0
     print('Resetting image zooids')
-    group = ImageGroup(group, database, online=destructive)
-    for image in group.images:
+    # group = ImageGroup(group, database, online=destructive)
+    for image in tqdm(image_group.images):
         if image.image_id not in images:
             if image.zoo_id != None:
                 reset_zooid += 1
@@ -78,9 +82,12 @@ def from_export(database_file, subject_export, group, destructive):
         with open(subject_export, 'r') as f:
             for row in csv.DictReader(f):
                 zoo_id = int(row['subject_id'])
-                image_id = json.loads(row['metadata'])['id']
+                metadata = json.loads(row['metadata'])
+                image_id = metadata['id']
+                group_id = metadata['#group']
 
-                yield zoo_id, image_id
+                if group_id == group:
+                    yield zoo_id, image_id
 
     check(zoo_subjects(), group, database, uploader, destructive)
 

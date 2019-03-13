@@ -137,7 +137,7 @@ class Database:
             self.conn = None
 
         def __enter__(self):
-            self.conn = sqlite3.connect(self.fname)
+            self.conn = sqlite3.connect(self.fname, timeout=60)
             return self.conn
 
         def __exit__(self, type, value, traceback):
@@ -465,6 +465,8 @@ class Database:
             for field in fields:
                 if 'fig_' in field:
                     fig_attrs[field[4:]] = row[field]
+                elif field == 'metadata':
+                    image_attrs[field] = json.loads(row[field])
                 else:
                     image_attrs[field] = row[field]
 
@@ -472,9 +474,15 @@ class Database:
             return image_attrs
 
         @classmethod
-        def get_group_images(cls, conn, group_id):
-            cursor = conn.execute(
-                'SELECT image_id FROM images WHERE group_id=?', (group_id,))
+        def get_group_images(cls, conn, group_id, ignore_zoo=False):
+            if ignore_zoo:
+                cursor = conn.execute("""
+                    SELECT image_id FROM images
+                    WHERE group_id=? AND zoo_id IS NULL
+                    """, (group_id,))
+            else:
+                cursor = conn.execute(
+                    'SELECT image_id FROM images WHERE group_id=?', (group_id,))
             for row in cursor:
                 yield row[0]
 

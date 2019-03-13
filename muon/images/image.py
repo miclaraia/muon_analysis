@@ -111,10 +111,14 @@ class Image(StorageObject):
         return data
 
     def fname(self):
+        return self._fname_static(self.image_id, self.group_id)
+
+    @staticmethod
+    def _fname_static(image_id, group_id):
         """
         Filename to use for this subject group
         """
-        return 'muon_group_%d_id_%d.jpg' % (self.group_id, self.image_id)
+        return 'muon_group_%d_id_%d.jpg' % (group_id, image_id)
 
     def plot(self, width, subject_storage, dpi=None, quality=None, path=None):
         """
@@ -161,7 +165,7 @@ class Image(StorageObject):
             plt.close(fig)
             return True
 
-        except Exception:
+        except (KeyboardInterrupt, Exception):
             os.remove(fname)
             raise
 

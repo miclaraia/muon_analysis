@@ -41,9 +41,9 @@ def main(database_file, image_path, subject_export, groups):
     else:
         existing_subjects = None
 
-    for group in [int(g) for g in groups.split(',')]:
-        logger.info('Group %d', group)
-        image_group = ImageGroup(group_id, database)
+    for group_id in [int(g) for g in groups.split(',')]:
+        logger.info('Group %d', group_id)
+        image_group = ImageGroup(group_id, database, online=True)
 
         image_group.upload_subjects(
             image_path, existing_subjects=existing_subjects)

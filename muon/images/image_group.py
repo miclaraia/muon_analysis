@@ -231,8 +231,13 @@ class ImageGroup(StorageObject):
         """
         uploader = panoptes.Uploader(muon.config.project, self.group_id)
 
+        if existing_subjects:
+            images = self.images
+        else:
+            images = self.images.upload_iter()
+
         print('Creating Panoptes subjects')
-        for image in tqdm(self.images):
+        for image in tqdm(images):
 
             if existing_subjects:
                 if image.image_id in existing_subjects:
@@ -252,6 +257,7 @@ class ImageGroup(StorageObject):
                 print('skipping {}'.format(image))
                 continue
             elif image.zoo_id is None:
+                image.zoo_id = -1
                 fname = os.path.join(
                     path, 'group_%d' % self.group_id, image.fname())
 
@@ -273,7 +279,7 @@ class ImageGroup(StorageObject):
         path = os.path.join(path, 'group_%d' % self.group_id)
         if not os.path.isdir(path):
             os.mkdir(path)
-        for image in tqdm(self.images):
+        for image in tqdm(self.images.gen_iter(path)):
             if image.plot(self.image_width, subject_storage,
                           dpi=dpi, path=path):
                 logger.info(image)
@@ -304,14 +310,47 @@ class ImageLoader:
                 del self._images[self._loaded_images.pop(0)]
         return self._images[image_id]
 
-    def __iter__(self):
+    def load_all(self):
+        with self.database.conn as conn:
+            image_ids = self.database.Image \
+                .get_group_images(conn, self.group_id)
+
+            for image_id in tqdm(image_ids):
+                self._images[image_id] = self._load_image(image_id)
+
+    def gen_iter(self, path):
         with self.database.conn as conn:
             image_ids = list(self.database.Image
-                    .get_group_images(conn, self.group_id))
+                .get_group_images(conn, self.group_id))
+            random.shuffle(image_ids)
+
+            for image_id in image_ids:
+                fname = Image._fname_static(image_id, self.group_id)
+                if not os.path.isfile(os.path.join(path, fname)):
+                    yield self._load_image(image_id)
+
+    def upload_iter(self):
+        with self.database.conn as conn:
+            image_ids = list(self.database.Image
+                .get_group_images(conn, self.group_id, ignore_zoo=True))
             random.shuffle(image_ids)
 
             for image_id in image_ids:
                 yield self._load_image(image_id)
+
+    def __iter__(self):
+        with self.database.conn as conn:
+            image_ids = list(self.database.Image
+                .get_group_images(conn, self.group_id))
+            image_ids = list(set(image_ids) - set(self._images.keys()))
+
+            random.shuffle(image_ids)
+
+            for image_id in image_ids:
+                if image_id in self._images:
+                    yield self._images[image_id]
+                else:
+                    yield self._load_image(image_id)
 
     def __len__(self):
         return self.image_count
