@@ -438,9 +438,45 @@ class Database:
             args.append(image_id)
             conn.execute(query, args)
 
+        # @classmethod
+        # def get_image(cls, conn, image_id):
+            # fields = [
+                # 'group_id',
+                # 'cluster',
+                # 'metadata',
+                # 'zoo_id',
+                # 'fig_dpi',
+                # 'fig_offset',
+                # 'fig_height',
+                # 'fig_width',
+                # 'fig_rows',
+                # 'fig_cols'
+                # ]
+
+            # cursor = conn.execute("""
+                # SELECT {}
+                # FROM images WHERE image_id=?""".format(','.join(fields)),
+                # (image_id,))
+            # row = cursor.fetchone()
+            # row = {fields[i]: v for i, v in enumerate(row)}
+
+            # image_attrs = {}
+            # fig_attrs = {}
+            # for field in fields:
+                # if 'fig_' in field:
+                    # fig_attrs[field[4:]] = row[field]
+                # elif field == 'metadata':
+                    # image_attrs[field] = json.loads(row[field])
+                # else:
+                    # image_attrs[field] = row[field]
+
+            # image_attrs['image_meta'] = fig_attrs
+            # return image_attrs
+
         @classmethod
-        def get_image(cls, conn, image_id):
+        def _parse_image_row(cls, row):
             fields = [
+                'image_id',
                 'group_id',
                 'cluster',
                 'metadata',
@@ -450,39 +486,102 @@ class Database:
                 'fig_height',
                 'fig_width',
                 'fig_rows',
-                'fig_cols'
+                'fig_cols',
+                'subjects'
                 ]
-
-            cursor = conn.execute("""
-                SELECT {}
-                FROM images WHERE image_id=?""".format(','.join(fields)),
-                (image_id,))
-            row = cursor.fetchone()
-            row = {fields[i]: v for i, v in enumerate(row)}
+            kwargs = {f: row[i] for i, f in enumerate(fields)}
+            kwargs['subjects'] = row[-1].split(',')
 
             image_attrs = {}
             fig_attrs = {}
-            for field in fields:
+            for field in kwargs:
                 if 'fig_' in field:
-                    fig_attrs[field[4:]] = row[field]
+                    fig_attrs[field[4:]] = kwargs[field]
                 elif field == 'metadata':
-                    image_attrs[field] = json.loads(row[field])
+                    image_attrs[field] = json.loads(kwargs[field])
                 else:
-                    image_attrs[field] = row[field]
+                    image_attrs[field] = kwargs[field]
 
             image_attrs['image_meta'] = fig_attrs
+
             return image_attrs
 
         @classmethod
-        def get_group_images(cls, conn, group_id, ignore_zoo=False):
-            if ignore_zoo:
-                cursor = conn.execute("""
-                    SELECT image_id FROM images
-                    WHERE group_id=? AND zoo_id IS NULL
-                    """, (group_id,))
+        def _build_get_query(cls, where=None, exclude_zoo=False, shuffle=False):
+            if where is None:
+                where = 'image_id'
+            if where == 'image_id':
+                where = 'WHERE images.image_id=?'
+            elif where == 'group_id':
+                where = 'WHERE images.group_id=?'
+                if exclude_zoo:
+                    where += ' AND image.zoo_id IS NULL'
+
+            if shuffle:
+                order = 'ORDER BY RANDOM()'
             else:
-                cursor = conn.execute(
-                    'SELECT image_id FROM images WHERE group_id=?', (group_id,))
+                order = ''
+
+            fields = ','.join([
+                'images.image_id',
+                'images.group_id',
+                'cluster',
+                'metadata',
+                'zoo_id',
+                'fig_dpi',
+                'fig_offset',
+                'fig_height',
+                'fig_width',
+                'fig_rows',
+                'fig_cols',
+                'GROUP_CONCAT(image_subjects.subject_id)'
+                ])
+
+            query = """
+                SELECT {fields}
+                FROM images JOIN image_subjects ON
+                    images.image_id=image_subjects.image_id
+                {where}
+                GROUP BY images.image_id
+                {order}
+            """.format(fields=fields, where=where, order=order)
+
+            return query
+
+        @classmethod
+        def get_images(cls, conn, image_ids):
+            query = cls._build_get_query(where='image_id')
+            cursor = conn.executemany(query, (image_ids,))
+            for row in cursor:
+                yield cls._parse_image_row(row)
+
+        @classmethod
+        def get_image(cls, conn, image_id):
+            query = cls._build_get_query(where='image_id')
+            cursor = conn.execute(query, (image_id,))
+            row = cursor.fetchone()
+            return cls._parse_image_row(row)
+
+        @classmethod
+        def get_group_images(cls, conn, group_id,
+                             exclude_zoo=False, shuffle=False):
+            query = cls._build_get_query(
+                where='group_id', exclude_zoo=exclude_zoo)
+            cursor = conn.execute(query, (group_id,))
+            for row in cursor:
+                yield cls._parse_image_row(row)
+
+        @classmethod
+        def get_group_image_ids(cls, conn, group_id,
+                                exclude_zoo=False, shuffle=False):
+            query = """
+                SELECT image_id FROM images
+                WHERE group_id=?
+            """
+            if exclude_zoo:
+                query += " AND zoo_id IS NULL"
+
+            cursor = conn.execute(query, (group_id,))
             for row in cursor:
                 yield row[0]
 

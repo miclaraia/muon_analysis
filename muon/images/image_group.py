@@ -296,6 +296,8 @@ class ImageLoader:
         self._loaded_images = []
         self._images = {}
 
+        self.load_limit = 10000
+
     def __getitem__(self, image_id):
         if image_id not in self._images:
             image = self._load_image(image_id)
@@ -306,51 +308,38 @@ class ImageLoader:
             self._images[image_id] = image
             self._loaded_images.append(image_id)
 
-            if len(self._images) > 1000:
+            if self.load_limit > 0 and len(self._images) > self.load_limit:
                 del self._images[self._loaded_images.pop(0)]
         return self._images[image_id]
 
     def load_all(self):
         with self.database.conn as conn:
-            image_ids = self.database.Image \
-                .get_group_images(conn, self.group_id)
-
-            for image_id in tqdm(image_ids):
-                self._images[image_id] = self._load_image(image_id)
+            for image in tqdm(self.database.Image
+                    .get_group_images(conn, self.group_id)):
+                image = self._create_image(image)
+                self._images[image.image_id] = image
 
     def gen_iter(self, path):
         with self.database.conn as conn:
-            image_ids = list(self.database.Image
-                .get_group_images(conn, self.group_id))
-            random.shuffle(image_ids)
-
-            for image_id in image_ids:
-                fname = Image._fname_static(image_id, self.group_id)
-                if not os.path.isfile(os.path.join(path, fname)):
-                    yield self._load_image(image_id)
+            for image in self.database.Image  \
+                    .get_group_images(
+                        conn, self.group_id, shuffle=True):
+                if not os.path.isfile(os.path.join(path, image.fname())):
+                    yield self._create_image(image)
 
     def upload_iter(self):
         with self.database.conn as conn:
-            image_ids = list(self.database.Image
-                .get_group_images(conn, self.group_id, ignore_zoo=True))
-            random.shuffle(image_ids)
-
-            for image_id in image_ids:
-                yield self._load_image(image_id)
+            for image in self.database.Image  \
+                    .get_group_images(
+                        conn, self.group_id, ignore_zoo=True, shuffle=True):
+                yield self._create_image(image)
 
     def __iter__(self):
         with self.database.conn as conn:
-            image_ids = list(self.database.Image
-                .get_group_images(conn, self.group_id))
-            image_ids = list(set(image_ids) - set(self._images.keys()))
+            for image in self.database.Image  \
+                    .get_group_images(conn, self.group_id, shuffle=True):
 
-            random.shuffle(image_ids)
-
-            for image_id in image_ids:
-                if image_id in self._images:
-                    yield self._images[image_id]
-                else:
-                    yield self._load_image(image_id)
+                yield self._create_image(image)
 
     def __len__(self):
         return self.image_count
@@ -358,3 +347,7 @@ class ImageLoader:
     def _load_image(self, image_id):
         image = Image(image_id, self.database, online=self.online)
         return image
+
+    def _create_image(self, image_dict):
+        return Image(image_dict['image_id'], self.database,
+                     online=self.online, attrs=image_dict)
