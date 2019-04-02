@@ -125,7 +125,9 @@ class Aggregate:
 
     def _clicked_subjects(self, image, clicks):
         for x, y in clicks:
-            yield image.at_location(x, y)
+            s = image.at_location(x, y)
+            if s is not None:
+                yield s
 
     def reduce_images(self):
         for image_id in sorted(self.images):
@@ -337,6 +339,7 @@ class Parse:
 
                     if self.should_use(row['created_at'], subject_metadata):
                         if group_id not in image_groups:
+                            logger.info('Loading group %d', group_id)
                             image_groups[group_id] = \
                                 ImageGroup(group_id, self.database)
                             image_groups[group_id].images.load_all()
@@ -365,7 +368,7 @@ class Parse:
     def parse_clicks(self, annotations):
         for task in annotations:
             if task['task'] in self.config.task_B:
-                print(task)
+                # print(task)
                 for item in task['value']:
                     yield item['x'], item['y']
 

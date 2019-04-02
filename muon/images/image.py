@@ -206,8 +206,20 @@ class Image(StorageObject):
         x = (x-offset)//x_
         y = (y-offset)//y_
 
+        if x >= cols or y >= rows:
+            # Selection outside of bounds
+            logger.error('Selection outside of bounds of image')
+            logger.warn(self)
+            logger.warn((x, y))
+            return
+
         i = int(x+cols*y)
         logger.debug(i)
+        if i >= len(self.subjects):
+            logger.error('Index out of bounds')
+            logger.error(i)
+            logger.error(self)
+            logger.error(self.subjects)
         return self.subjects[i]
 
     class ImageMeta:
