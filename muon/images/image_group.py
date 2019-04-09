@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ImageGroup(StorageObject):
 
+    TYPE = {s: i for i, s in enumerate(['grid', 'single'])}
     image_count = StorageAttribute('image_count')
 
     def __init__(self, group_id, database, attrs=None, online=False):
@@ -37,6 +38,7 @@ class ImageGroup(StorageObject):
         if attrs is None:
             with self.conn as conn:
                 attrs = database.ImageGroup.get_group(conn, group_id)
+        self.group_type = attrs['group_type']
         self.image_size = attrs['image_size']
         self.image_width = attrs['image_width']
         self.description = attrs['description']
@@ -78,6 +80,7 @@ class ImageGroup(StorageObject):
 
         attrs = {
             'image_size': kwargs.get('image_size', 36),
+            'group_type': self.TYPE[kwargs.get('group_type', 'grid')],
             'image_width': kwargs.get('image_width', 6),
             'description': kwargs.get('description', None),
             'permutations': kwargs.get('permutations', 1),

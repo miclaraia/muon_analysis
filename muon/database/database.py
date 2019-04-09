@@ -58,6 +58,7 @@ class Database:
 
                 CREATE TABLE IF NOT EXISTS image_groups (
                     group_id integer PRIMARY KEY,
+                    group_type integer NOT NULL,
                     cluster_name TEXT NOT NULL,
                     image_count integer,
                     image_size integer,
@@ -65,9 +66,6 @@ class Database:
                     description text,
                     permutations integer
                 );
-
-
-
 
                 CREATE TABLE IF NOT EXISTS subjects (
                     subject_id TEXT PRIMARY KEY, -- assigned subject id
@@ -617,6 +615,7 @@ class Database:
 
             data = {
                 'group_id': group.group_id,
+                'group_type': group.group_type,
                 'image_count': group.image_count,
                 'cluster_name': group.cluster_name,
                 'image_size': group.image_size,
@@ -657,6 +656,7 @@ class Database:
         def get_group(cls, conn, group_id):
             fields = [
                 'image_count',
+                'group_type',
                 'cluster_name',
                 'image_size',
                 'image_width',
