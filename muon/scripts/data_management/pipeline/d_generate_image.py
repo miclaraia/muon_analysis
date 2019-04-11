@@ -18,7 +18,7 @@ def main(database_file, image_dir, groups, dpi):
 
     for group in [int(g) for g in groups.split(',')]:
         print('Group', group)
-        group = ImageGroup(group, database, online=True)
+        group = ImageGroup.load(group, database, online=True)
         print(group)
         group.generate_images(
             subject_storage, path=image_dir, dpi=dpi)

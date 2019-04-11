@@ -38,7 +38,7 @@ def main(database_file, image_path):
         # database.ImageGroup.delete_group(conn, 100)
         # conn.commit()
 
-    image_group = ImageGroup(0, database)
+    image_group = ImageGroup.load(0, database)
     image_group.images = {i: image_group.images[i] for i in ids}
     image_group.upload_subjects(image_path)
 

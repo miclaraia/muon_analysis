@@ -341,7 +341,7 @@ class Parse:
                         if group_id not in image_groups:
                             logger.info('Loading group %d', group_id)
                             image_groups[group_id] = \
-                                ImageGroup(group_id, self.database)
+                                ImageGroup.load(group_id, self.database)
                             image_groups[group_id].images.load_all()
 
                         choice = self.parse_choice(annotations)

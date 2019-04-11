@@ -75,7 +75,6 @@ class Subjects:
                 grid_args = {}
             fig = self._plot_add_grid(fig, w, l, **grid_args)
 
-
         if meta:
             size = fig.get_size_inches()
             meta = {

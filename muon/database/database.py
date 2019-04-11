@@ -212,6 +212,14 @@ class Database:
             )
 
         @classmethod
+        def get_subject_ids_in_batch(cls, conn, batch_id):
+            cursor = conn.execute("""
+                SELECT subject_id FROM subjects WHERE batch_id=?
+                """, (batch_id,))
+            for row in cursor:
+                yield row[0]
+
+        @classmethod
         def get_subject_batch(cls, conn, batch_id):
             cursor = conn.execute("""
                 SELECT subject_id, charge FROM subjects
@@ -578,6 +586,8 @@ class Database:
             """
             if exclude_zoo:
                 query += " AND zoo_id IS NULL"
+            if shuffle:
+                query += " ORDER BY RANDOM()"
 
             cursor = conn.execute(query, (group_id,))
             for row in cursor:

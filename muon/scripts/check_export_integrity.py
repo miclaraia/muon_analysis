@@ -19,7 +19,7 @@ def check(zoo_subjects, group, database, uploader, destructive):
     unlink = []
     set_zooid = 0
 
-    image_group = ImageGroup(group, database)
+    image_group = ImageGroup.load(group, database)
     image_group.images.load_all()
     for zoo_id, image_id in tqdm(zoo_subjects):
         # image = Image(image_id, database, online=destructive)
