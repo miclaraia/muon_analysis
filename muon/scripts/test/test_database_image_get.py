@@ -5,10 +5,17 @@ import click
 import os
 from tqdm import tqdm
 
-database = Database(os.path.join(os.getenv('MUOND'), 'subjects-main/data-main.db'))
+#fname = '/home/michael/Documents/Zooniverse/repos/muon/data/subjects/ralph_subjects/data.db'
+fname = os.path.join(os.getenv('MUOND'), 'subjects-main/data-main.db')
+database = Database(fname)
+#database = Database(os.path.join(os.getenv('MUOND'), 'subjects-main/data-main.db'))
 
 
-ImageGroup(10, database).images.load_all()
+ImageGroup.load(20, database).images.load_all()
+group = ImageGroup.load(20, database)
+
+for image in tqdm(group.images.gen_iter('.')):
+    print(image)
 # with database.conn as conn:
     # cursor = database.Image.get_group_images(conn, 11)
     # for i in tqdm(cursor):

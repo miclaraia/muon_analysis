@@ -240,7 +240,7 @@ class ImageLoader:
         with self.database.conn as conn:
             image_ids = list(self.database.Image
                 .get_group_image_ids(
-                    conn, self.group_id, ignore_zoo=True, shuffle=True))
+                    conn, self.group_id, exclude_zoo=True, shuffle=True))
 
             for image_id in image_ids:
                 image = self.database.Image.get_image(conn, image_id)
