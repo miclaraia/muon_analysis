@@ -134,7 +134,8 @@ class ImageGroupParent(StorageObject):
         """
         Upload generated images to Panoptes
         """
-        uploader = panoptes.Uploader(muon.config.project, self.group_id)
+        project_id = muon.config.Panoptes().project_id
+        uploader = panoptes.Uploader(project_id, self.group_id)
 
         if existing_subjects:
             images = self.images

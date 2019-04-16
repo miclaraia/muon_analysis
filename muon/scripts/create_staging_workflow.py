@@ -19,7 +19,7 @@ logging.warn('test')
 @click.argument('database_file')
 @click.argument('image_path')
 def main(database_file, image_path):
-    muon.config.project = 1815
+    muon.config._instance.config['panoptes']['project_id'] = 1815
 
     pan.Uploader._client = pan.Panoptes.connect(
         endpoint='https://panoptes-staging.zooniverse.org')
