@@ -5,15 +5,18 @@ from tqdm import tqdm
 
 @click.group(invoke_without_command=True)
 @click.argument('save_dir')
-@click.argument('database_file')
+@click.option('--config')
 @click.option('--batches')
-def main(save_dir, database_file, batches):
+def main(save_dir, config, batches):
     from muon.subjects.storage import Storage
     from muon.database.database import Database
     from muon.project.clustering import Clustering
+    import muon.config
 
     from redec_keras.models.decv2 import Config
-    database = Database(database_file)
+
+    muon.config.Config.new(config)
+    database = Database()
     storage = Storage(database)
 
     config = Config.load(save_dir)

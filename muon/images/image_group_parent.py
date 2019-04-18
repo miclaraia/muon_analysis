@@ -5,7 +5,7 @@ import logging
 from tqdm import tqdm
 
 import muon.project.panoptes as panoptes
-import muon.config
+from muon.config import Config
 from muon.subjects.subjects import Subjects
 from muon.database.utils import StorageObject, StorageAttribute, \
         StoredAttribute
@@ -130,11 +130,14 @@ class ImageGroupParent(StorageObject):
     def __repr__(self):
         return str(self)
 
-    def upload_subjects(self, path, existing_subjects=None):
+    def upload_subjects(self, existing_subjects=None):
         """
         Upload generated images to Panoptes
         """
-        project_id = muon.config.Panoptes().project_id
+        config = Config.instance()
+        image_path = config.storage.image_path
+        project_id = config.panoptes.project_id
+
         uploader = panoptes.Uploader(project_id, self.group_id)
 
         if existing_subjects:
@@ -178,10 +181,13 @@ class ImageGroupParent(StorageObject):
             else:
                 raise Exception
 
-    def generate_images(self, subject_storage, dpi=None, path=None):
+    def generate_images(self, subject_storage, dpi=None):
         """
         Generate subject images to be uploaded to Panoptes
         """
+        config = Config.instance()
+        image_path = config.storage.image_path
+
         path = os.path.join(path, 'group_%d' % self.group_id)
         if not os.path.isdir(path):
             os.mkdir(path)

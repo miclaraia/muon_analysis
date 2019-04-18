@@ -5,16 +5,18 @@ import logging
 from muon.subjects.storage import Storage
 from muon.database.database import Database
 from muon.images.image_group import ImageGroup
+from muon.config import Config
 
 logger = logging.getLogger(__name__)
 
 
 @click.group(invoke_without_command=True)
-@click.argument('database_file')
+@click.option('--config')
 @click.argument('cluster_name')
 @click.option('--batches', required=True)
-def main(database_file, cluster_name, batches):
-    database = Database(database_file)
+def main(config, cluster_name, batches):
+    Config.new(config)
+    database = Database()
     subject_storage = Storage(database)
 
     kwargs = {

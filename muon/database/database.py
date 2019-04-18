@@ -5,11 +5,14 @@ import json
 from tqdm import tqdm
 
 from muon.subjects.subject import Subject
+from muon.config import Config
 
 
 class Database:
 
-    def __init__(self, fname):
+    def __init__(self, fname=None):
+        if fname is None:
+            fname = Config.instance().Storage.database
         self.fname = fname
 
         if not os.path.isfile(fname):

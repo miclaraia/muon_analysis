@@ -31,10 +31,42 @@ class Config:
         with open(self.path, 'r') as f:
             self.config = yaml.load(f)
 
-        Config._instance = self
+    @classmethod
+    def instance(cls):
+        if cls._instance is None:
+            cls.new()
+        return cls._instance
+
+    @classmethod
+    def new(cls, *args, **kwargs):
+        self = cls(*args, **kwargs)
+        cls._instance = self
+        return self
+
+    @property
+    def classification(self):
+        return Classification(self.config)
+
+    @property
+    def panoptes(self):
+        return Panoptes(self.config)
+
+    @property
+    def plotting(self):
+        return Plotting(self.config)
+
+    @property
+    def storage(self):
+        return Storage(self.config)
 
 
-class Plotting(Config):
+class SubConfig:
+
+    def __init__(self, config):
+        self.config = config
+
+
+class Plotting(SubConfig):
 
     @property
     def _config(self):
@@ -45,7 +77,7 @@ class Plotting(Config):
         return self._config['cmap']
 
 
-class Panoptes(Config):
+class Panoptes(SubConfig):
 
     @property
     def _config(self):
@@ -57,7 +89,7 @@ class Panoptes(Config):
         return project_id or self._config['project_id']
 
 
-class Storage(Config):
+class Storage(SubConfig):
 
     @property
     def _config(self):
@@ -78,7 +110,7 @@ class Storage(Config):
         return self._pre(self._config['images'])
 
 
-class Classification(Config):
+class Classification(SubConfig):
 
     @property
     def _config(self):

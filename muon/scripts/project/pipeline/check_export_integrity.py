@@ -7,6 +7,7 @@ from muon.database.database import Database
 from muon.project.panoptes import Uploader
 from muon.images.image_group import ImageGroup
 from muon.images.image import Image
+from muon.config import Config
 
 
 @click.group()
@@ -55,11 +56,12 @@ def check(zoo_subjects, group, database, uploader, destructive):
 
 
 @cli.command()
-@click.argument('database_file')
+@click.option('--config')
 @click.option('--group', type=int, required=True)
 @click.option('--destructive', is_flag=True)
-def online(database_file, group, destructive):
-    database = Database(database_file)
+def online(config, group, destructive):
+    Config.new(config)
+    database = Database()
     uploader = Uploader(5918, group)
 
     def zoo_subjects():
@@ -70,12 +72,13 @@ def online(database_file, group, destructive):
 
 
 @cli.command()
-@click.argument('database_file')
+@click.option('--config')
 @click.argument('subject_export')
 @click.option('--group', type=int, required=True)
 @click.option('--destructive', is_flag=True)
-def from_export(database_file, subject_export, group, destructive):
-    database = Database(database_file)
+def from_export(config, subject_export, group, destructive):
+    Config.new(config)
+    database = Database()
     uploader = Uploader(5918, group)
 
     def zoo_subjects():

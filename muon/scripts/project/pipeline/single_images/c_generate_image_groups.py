@@ -5,15 +5,17 @@ import logging
 from muon.subjects.storage import Storage
 from muon.database.database import Database
 from muon.images.image_group_single import SingleImageGroup
+from muon.config import Config
 
 logger = logging.getLogger(__name__)
 
 
 @click.group(invoke_without_command=True)
-@click.argument('database_file')
+@click.option('--config')
 @click.option('--batches', required=True)
-def main(database_file, batches):
-    database = Database(database_file)
+def main(config, batches):
+    Config.new(config)
+    database = Database()
 
     with database.conn as conn:
 

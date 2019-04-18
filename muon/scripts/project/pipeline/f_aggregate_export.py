@@ -11,6 +11,7 @@ logger.warn(3)
 
 from muon.database.database import Database
 from muon.project.parse_export import Aggregate
+from muon.config import Config
 
 
 class config:
@@ -32,11 +33,13 @@ class config:
 
 
 @click.group(invoke_without_command=True)
-@click.argument('database_file')
+@click.option('--config')
 @click.argument('export_file')
 @click.argument('out_file')
 def main(database_file, export_file, out_file):
-    database = Database(database_file)
+    Config.new(config)
+    database = Database()
+
     agg = Aggregate(config, database)
     agg.aggregate(export_file)
 

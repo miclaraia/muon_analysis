@@ -9,6 +9,7 @@ from muon.subjects.subjects import Subject
 from muon.subjects.parsing import ParseFits
 from muon.database.database import Database
 from muon.subjects.source import Source
+from muon.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +51,11 @@ def cli():
 
 @cli.command()
 @click.argument('manifest')
-@click.argument('database_file')
+@click.option('--config')
 @click.option('--batch', nargs=1, type=int)
-def one(input_file, database_file, batch):
-    database = Database(database_file)
+def one(input_file, config, batch):
+    Config.new(config)
+    database = Database()
     storage = Storage(database)
 
     add_file(input_file, storage, database, batch)
@@ -61,9 +63,10 @@ def one(input_file, database_file, batch):
 
 @cli.command()
 @click.argument('manifest')
-@click.argument('database_file')
-def manifest(manifest, database_file):
-    database = Database(database_file)
+@click.option('--config')
+def manifest(manifest, config):
+    Config.new(config)
+    database = Database()
     storage = Storage(database)
 
     path = os.path.dirname(manifest)

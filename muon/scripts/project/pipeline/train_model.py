@@ -13,6 +13,7 @@ import os
 from muon.subjects.storage import Storage
 from muon.database.database import Database
 from muon.project.clustering import Clustering
+import muon.config
 
 from redec_keras.models.decv2 import Config
 
@@ -20,10 +21,11 @@ from redec_keras.models.decv2 import Config
 @click.group(invoke_without_command=True)
 @click.option('--name')
 @click.option('--save_dir')
-@click.option('--database_file')
+@click.option('--config')
 @click.option('--batches')
-def main(name, save_dir, database_file, batches):
-    database = Database(database_file)
+def main(name, save_dir, config, batches):
+    muon.config.Config.new(config)
+    database = Database()
     storage = Storage(database)
 
     # Clustering.reserve_test_set(storage)

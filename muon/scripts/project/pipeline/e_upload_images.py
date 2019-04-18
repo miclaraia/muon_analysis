@@ -9,6 +9,7 @@ import json
 from muon.database.database import Database
 from muon.images.image_group import ImageGroup
 import muon.project.panoptes as pan
+from muon.config import Config
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -17,12 +18,12 @@ print(logger.level, logging.DEBUG)
 logging.warn('%s', logger.level)
 
 @click.group(invoke_without_command=True)
-@click.argument('database_file')
-@click.argument('image_path')
+@click.option('--config')
 @click.option('--subject_export')
 @click.option('--groups', required=True)
-def main(database_file, image_path, subject_export, groups):
-    database = Database(database_file)
+def main(config, subject_export, groups):
+    Config.new(config)
+    database = Database()
     pan.Uploader.client()
 
     if subject_export:
@@ -45,8 +46,7 @@ def main(database_file, image_path, subject_export, groups):
         logger.info('Group %d', group_id)
         image_group = ImageGroup.load(group_id, database, online=True)
 
-        image_group.upload_subjects(
-            image_path, existing_subjects=existing_subjects)
+        image_group.upload_subjects(existing_subjects=existing_subjects)
 
 
 if __name__ == '__main__':
