@@ -849,10 +849,12 @@ class Database:
                 LIMIT 1
             """
             cursor = conn.execute(query)
-            row = next(cursor)
-            fields = ['job_id', 'job_type', 'job_status']
-            row = {f: row[i] for i, f in enumerate(fields)}
-            row['image_ids'] = None
+            row = cursor.fetchone()
+
+            if row is not None:
+                fields = ['job_id', 'job_type', 'job_status']
+                row = {f: row[i] for i, f in enumerate(fields)}
+                row['image_ids'] = None
 
             return row
 

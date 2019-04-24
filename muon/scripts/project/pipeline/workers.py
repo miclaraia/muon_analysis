@@ -36,7 +36,7 @@ def upload(group):
 def run():
     database = Database()
     worker = Workers(database)
-    worker.run()
+    worker.run_all()
 
 
 cli()

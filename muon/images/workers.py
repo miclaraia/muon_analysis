@@ -63,6 +63,9 @@ class Workers:
     def run(self):
         with self.database.conn as conn:
             job = self.database.ImageWorker.get_job(conn)
+            if job is None:
+                return False
+
             job = Job(**job)
             self.database.ImageWorker.set_job_status(conn, job.job_id, 1)
             conn.commit()
@@ -71,6 +74,12 @@ class Workers:
         with self.database.conn as conn:
             self.database.ImageWorker.set_job_status(conn, job.job_id, 2)
             conn.commit()
+
+        return True
+
+    def run_all(self):
+        while self.run():
+            pass
 
 
 class Job:
