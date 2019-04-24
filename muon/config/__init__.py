@@ -76,6 +76,10 @@ class Plotting(SubConfig):
     def cmap(self):
         return self._config['cmap']
 
+    @property
+    def dpi(self):
+        return self._config['dpi']
+
 
 class Panoptes(SubConfig):
 

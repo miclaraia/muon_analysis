@@ -36,11 +36,11 @@ class config:
 @click.option('--config')
 @click.argument('export_file')
 @click.argument('out_file')
-def main(database_file, export_file, out_file):
-    Config.new(config)
+def main(config, export_file, out_file):
+    config = Config.new(config)
     database = Database()
 
-    agg = Aggregate(config, database)
+    agg = Aggregate(config.classification, database)
     agg.aggregate(export_file)
 
     data = {'subjects': agg.subjects, 'images': agg.images}

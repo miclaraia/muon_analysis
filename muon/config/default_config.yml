@@ -1,5 +1,6 @@
 plotting:
   cmap: 'jet'
+  dpi: 300
 
 panoptes:
   project_id: 5918
