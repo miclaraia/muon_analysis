@@ -1,11 +1,19 @@
 
 import click
 from tqdm import tqdm
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+print(logger.level, logging.DEBUG)
+logging.warn('%s', logger.level)
+logger.debug(1)
 
 from muon.subjects.storage import Storage
 from muon.database.database import Database
 from muon.images.image_group import ImageGroup
 from muon.config import Config
+
 
 
 @click.group(invoke_without_command=True)

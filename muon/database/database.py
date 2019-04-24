@@ -3,16 +3,19 @@ import os
 import numpy as np
 import json
 from tqdm import tqdm
+import logging
 
 from muon.subjects.subject import Subject
 from muon.config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class Database:
 
     def __init__(self, fname=None):
         if fname is None:
-            fname = Config.instance().Storage.database
+            fname = Config.instance().storage.database
         self.fname = fname
 
         if not os.path.isfile(fname):
@@ -524,7 +527,7 @@ class Database:
             elif where == 'group_id':
                 where = 'WHERE images.group_id=?'
                 if exclude_zoo:
-                    where += ' AND image.zoo_id IS NULL'
+                    where += ' AND images.zoo_id IS NULL'
 
             if shuffle:
                 order = 'ORDER BY RANDOM()'

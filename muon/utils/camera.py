@@ -261,7 +261,7 @@ class CameraPlot:
             colors.append(c)
             rot += math.pi/3
 
-        cmap = muon.config.Plotting.cmap
+        cmap = muon.config.Config.instance().plotting.cmap
         pc = PatchCollection(patches, cmap=cmap, alpha=1)
         pc.set_array(np.array(colors))
         ax.add_collection(pc)
