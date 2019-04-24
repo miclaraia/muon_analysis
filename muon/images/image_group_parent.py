@@ -9,16 +9,17 @@ from muon.config import Config
 from muon.subjects.subjects import Subjects
 from muon.database.utils import StorageObject, StorageAttribute, \
         StoredAttribute
-from muon.images.image import Image
+from muon.images.image_parent import ImageParent
 from muon.images.single_image import SingleImage
+from muon.images import TYPES
 
 logger = logging.getLogger(__name__)
 
 
 class ImageGroupParent(StorageObject):
 
-    TYPES = {s: i for i, s in enumerate(['grid', 'single'])}
     image_count = StorageAttribute('image_count')
+    TYPES = TYPES
 
     def __init__(self, group_id, database, attrs=None, online=False):
     # def __init__(self, group_id, database, attrs=None):
@@ -135,7 +136,7 @@ class ImageGroupParent(StorageObject):
         Upload generated images to Panoptes
         """
         config = Config.instance()
-        image_path = config.storage.image_path
+        image_path = config.storage.images
         project_id = config.panoptes.project_id
 
         uploader = panoptes.Uploader(project_id, self.group_id)
@@ -168,7 +169,7 @@ class ImageGroupParent(StorageObject):
             elif image.zoo_id is None:
                 image.zoo_id = -1
                 fname = os.path.join(
-                    path, 'group_%d' % self.group_id, image.fname())
+                    image_path, 'group_%d' % self.group_id, image.fname())
 
                 subject = panoptes.Subject()
                 subject.add_location(fname)
@@ -186,14 +187,15 @@ class ImageGroupParent(StorageObject):
         Generate subject images to be uploaded to Panoptes
         """
         config = Config.instance()
-        image_path = config.storage.image_path
+        image_path = config.storage.images
 
-        path = os.path.join(path, 'group_%d' % self.group_id)
-        if not os.path.isdir(path):
-            os.mkdir(path)
-        for image in tqdm(self.images.gen_iter(path)):
+        image_path = os.path.join(image_path, 'group_%d' % self.group_id)
+        logger.debug('image_path: %s', image_path)
+        if not os.path.isdir(image_path):
+            os.mkdir(image_path)
+        for image in tqdm(self.images.gen_iter(image_path)):
             if image.plot(self.image_width, subject_storage,
-                          dpi=dpi, path=path):
+                          dpi=dpi, path=image_path):
                 logger.info(image)
 
 
@@ -207,7 +209,7 @@ class ImageLoader:
         self.image_count = image_count
         self._loaded_images = []
         self._images = {}
-        self._group_type = group_type 
+        self._group_type = group_type
 
         self.load_limit = 10000
 
@@ -234,14 +236,21 @@ class ImageLoader:
 
     def gen_iter(self, path):
         with self.database.conn as conn:
-            image_ids = list(self.database.Image
-                .get_group_image_ids(conn, self.group_id, shuffle=True))
-
-            for image_id in image_ids:
-                image = self.database.Image.get_image(conn, image_id)
+            for image in tqdm(self.database.Image.get_group_images_batched(
+                    conn, self.group_id, 100, shuffle=True)):
                 image = self._create_image(image)
                 if not os.path.isfile(os.path.join(path, image.fname())):
                     yield image
+
+
+            # image_ids = list(self.database.Image
+                # .get_group_image_ids(conn, self.group_id, shuffle=True))
+
+            # for image_id in image_ids:
+                # image = self.database.Image.get_image(conn, image_id)
+                # image = self._create_image(image)
+                # if not os.path.isfile(os.path.join(path, image.fname())):
+                    # yield image
 
     def upload_iter(self):
         with self.database.conn as conn:
@@ -270,11 +279,11 @@ class ImageLoader:
             return SingleImage
 
     def _load_image(self, image_id):
-        Image_ = self._image_type()
-        return Image_(image_id, self.database, online=self.online)
+        return Image.create_image(
+            self._group_type, image_id, self.database, online=self.online)
 
     def _create_image(self, image_dict):
-        Image_ = self._image_type()
-        return Image_(image_dict['image_id'], self.database,
-                      online=self.online, attrs=image_dict)
+        return Image.create_image(
+            image_dict['image_id'], self.database,
+            online=self.online, attrs=image_dict)
 

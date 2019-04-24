@@ -2,10 +2,10 @@ from collections import OrderedDict
 import os
 import matplotlib.pyplot as plt
 
-from muon.images.image import Image
+from muon.images.image_parent import ImageParent
 
 
-class SingleImage(Image):
+class SingleImage(ImageParent):
 
     @classmethod
     def new(cls, database, group_id, metadata, subject, **kwargs):
@@ -80,7 +80,7 @@ class SingleImage(Image):
             subject.plot(ax)
 
             dpi = dpi or 300
-            self.image_meta = Image.ImageMeta(dpi=dpi)
+            self.image_meta = ImageParent.ImageMeta(dpi=dpi)
 
             fig.savefig(fname, dpi=dpi, quality=quality)
             plt.close(fig)

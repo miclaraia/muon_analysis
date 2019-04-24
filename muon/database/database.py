@@ -130,6 +130,19 @@ class Database:
                     hash TEXT NOT NULL,
                     updated TIMESTAMP NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS workers (
+                    job_id INTEGER PRIMARY KEY,
+                    job_type TEXT,
+                    job_status INTEGER
+                );
+
+                CREATE TABLE IF NOT EXISTS worker_images (
+                    job_id INTEGER,
+                    image_id INTEGER
+                );
+                CREATE INDEX IF NOT EXISTS worker_image_job
+                    ON worker_images (job_id);
             """
             print(query)
             conn.executescript(query)
@@ -584,6 +597,39 @@ class Database:
                 yield cls._parse_image_row(row)
 
         @classmethod
+        def get_group_images_batched(
+                cls, conn, group_id, batch_size,
+                exclude_zoo=False, shuffle=False):
+            logger.debug(1)
+            image_ids = cls.get_group_image_ids(
+                conn, group_id,
+                exclude_zoo=exclude_zoo,
+                shuffle=shuffle)
+            image_ids = list(image_ids)
+
+            query = cls._build_get_query(
+                where='image_id', exclude_zoo=exclude_zoo)
+            for batch in np.array_split(np.array(image_ids), batch_size):
+                query_sub = '({})'.format(
+                    ','.join(['?' for _ in range(len(batch))]))
+                query_ = query.replace(
+                    'image_id=?', 'image_id IN {}'.format(query_sub))
+                print(query_)
+                cursor = conn.execute(query_, list(batch))
+                for row in cursor:
+                    yield cls._parse_image_row(row)
+                # for row in cls.get_images(conn, list(batch)):
+                    # yield row
+                
+
+
+            # query = cls._build_get_query(
+                # where='group_id', exclude_zoo=exclude_zoo)
+            # cursor = conn.execute(query, (group_id,))
+            # for row in cursor:
+                # yield cls._parse_image_row(row)
+
+        @classmethod
         def get_group_image_ids(cls, conn, group_id,
                                 exclude_zoo=False, shuffle=False):
             query = """
@@ -748,9 +794,112 @@ class Database:
             args.append(source_id)
             conn.execute(query, args)
 
+    class ImageWorker:
+
+        @classmethod
+        def next_id(cls, conn):
+            cursor = conn.execute('SELECT MAX(job_id) FROM workers')
+            last_id = cursor.fetchone()[0]
+            if last_id is None:
+                return 0
+            return last_id + 1
 
 
+        @classmethod
+        def add_jobs(cls, conn, jobs):
+            query1 = """
+                INSERT INTO workers (job_id,job_type,job_status)
+                VALUES (?,?,?)
+            """
+            query2 = """
+                INSERT INTO worker_images (job_id,image_id) VALUES (?,?)
+            """
 
+            print(jobs)
 
+            def job_iter():
+                for job in jobs:
+                    yield (
+                        (job.job_id, job.job_type, 0),
+                        [(job.job_id, int(i)) for i in job.image_ids]
+                    )
+                print(job.__dict__)
+                print(next(job_iter()))
 
+            for arg1, arg2 in job_iter():
+                conn.execute(query1, arg1)
+                print(arg1, arg2)
+                conn.executemany(query2, arg2)
 
+        @classmethod
+        def set_job_status(cls, conn, job_id, job_status):
+            query = """
+                UPDATE workers
+                SET job_status=?
+                WHERE job_id=?
+            """
+            conn.execute(query, (job_status, job_id))
+
+        @classmethod
+        def get_job(cls, conn):
+            query = """
+                SELECT job_id,job_type,job_status
+                FROM workers
+                WHERE job_status=0
+                LIMIT 1
+            """
+            cursor = conn.execute(query)
+            row = next(cursor)
+            fields = ['job_id', 'job_type', 'job_status']
+            row = {f: row[i] for i, f in enumerate(fields)}
+            row['image_ids'] = None
+
+            return row
+
+        @classmethod
+        def get_job_images(cls, conn, job_id):
+            fields = ','.join([
+                'images.image_id',
+                'images.group_id',
+                'images.cluster',
+                'images.metadata',
+                'images.zoo_id',
+                'images.fig_dpi',
+                'images.fig_offset',
+                'images.fig_height',
+                'images.fig_width',
+                'images.fig_rows',
+                'images.fig_cols',
+                'GROUP_CONCAT(image_subjects.subject_id)',
+                'image_groups.image_width',
+                'image_groups.group_type',
+                ])
+
+            query = """
+                SELECT {fields}
+                FROM workers
+                INNER JOIN worker_images
+                    ON workers.job_id=worker_images.job_id
+                INNER JOIN images
+                    ON images.image_id=worker_images.image_id
+                INNER JOIN image_subjects
+                    ON image_subjects.image_id=worker_images.image_id
+                INNER JOIN image_groups
+                    ON image_groups.group_id=images.group_id
+                WHERE workers.job_id=?
+                GROUP BY worker_images.image_id
+            """.format(fields=fields)
+
+            print(query)
+            cursor = conn.execute(query, (job_id,))
+
+            for row in cursor:
+                image = Database.Image._parse_image_row(row[:-2])
+                image_width = row[-2]
+                image_type = row[-1]
+                yield image, image_width, image_type
+
+        @classmethod
+        def clear_jobs(cls, conn):
+            conn.execute('DELETE FROM workers')
+            conn.execute('DELETE FROM worker_images')
