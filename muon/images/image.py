@@ -1,6 +1,5 @@
 from muon.images.image_parent import ImageParent
 from muon.images.single_image import SingleImage
-from muon.images.image_group_parent import ImageGroupParent
 
 
 class Image(ImageParent):

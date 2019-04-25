@@ -31,7 +31,7 @@ class Workers:
                 return next(next_id_iter)
 
             image_ids = np.array(image_ids)
-            batches = np.array_split(image_ids, image_ids.size/100)
+            batches = np.array_split(image_ids, max(1, image_ids.size/100))
             print(batches)
 
             jobs = []

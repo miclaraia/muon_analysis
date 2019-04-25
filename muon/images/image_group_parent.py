@@ -9,8 +9,7 @@ from muon.config import Config
 from muon.subjects.subjects import Subjects
 from muon.database.utils import StorageObject, StorageAttribute, \
         StoredAttribute
-from muon.images.image_parent import ImageParent
-from muon.images.single_image import SingleImage
+from muon.images.image import Image
 from muon.images import TYPES
 
 logger = logging.getLogger(__name__)
@@ -272,11 +271,11 @@ class ImageLoader:
     def __len__(self):
         return self.image_count
 
-    def _image_type(self):
-        if self._group_type == ImageGroupParent.TYPES['grid']:
-            return Image
-        elif self._group_type == ImageGroupParent.TYPES['single']:
-            return SingleImage
+    # def _image_type(self):
+        # if self._group_type == ImageGroupParent.TYPES['grid']:
+            # return Image
+        # elif self._group_type == ImageGroupParent.TYPES['single']:
+            # return SingleImage
 
     def _load_image(self, image_id):
         return Image.create_image(
@@ -284,6 +283,7 @@ class ImageLoader:
 
     def _create_image(self, image_dict):
         return Image.create_image(
+            self._group_type,
             image_dict['image_id'], self.database,
             online=self.online, attrs=image_dict)
 
