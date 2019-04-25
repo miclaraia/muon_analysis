@@ -47,7 +47,8 @@ class Subjects:
         return s.plot_subjects(plt.figure(), **kwargs)
 
     def plot_subjects(self, fig=None, w=5, camera=None,
-                      grid=False, grid_args=None, meta=None):
+                      grid=False, grid_args=None, meta=None,
+                      plot_text=None):
         if camera is None:
             camera = Camera()
 
@@ -68,7 +69,11 @@ class Subjects:
         if w == 1:
             axes = [axes]
         for i, subject in enumerate(self.list()):
-            subject.plot(axes[i], camera)
+            ax = axes[i]
+            subject.plot(ax, camera)
+            if plot_text:
+                ax.text(0, 0, plot_text[subject.id],
+                        fontsize=18, bbox=dict(facecolor='white', alpha=0.7))
 
         if grid:
             if grid_args is None:
@@ -85,6 +90,7 @@ class Subjects:
             }
 
             return fig, meta
+
         return fig
 
     @staticmethod
