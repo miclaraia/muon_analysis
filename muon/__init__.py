@@ -1,3 +1,5 @@
 
 import logging
-logging.basicConfig(level='INFO')
+import muon.config
+
+logging.basicConfig(level=muon.config.Config.instance().loglevel)

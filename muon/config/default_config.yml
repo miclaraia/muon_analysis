@@ -1,3 +1,5 @@
+general:
+  loglevel: 'INFO'
 plotting:
   cmap: 'jet'
   dpi: 300

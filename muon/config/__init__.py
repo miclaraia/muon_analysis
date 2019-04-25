@@ -59,6 +59,10 @@ class Config:
     def storage(self):
         return Storage(self.config)
 
+    @property
+    def loglevel(self):
+        return self.config['general']['loglevel']
+
 
 class SubConfig:
 
