@@ -30,6 +30,7 @@ def main(source_path, config):
                 "vegas_cleaned",?);
         """
 
+        # sources = ['SIMS150020.fits']
         print(sources)
         print(query)
         for source in sources:
@@ -43,17 +44,23 @@ def main(source_path, config):
                     label = row['IsMuon']
                     id_ = (row['RunNum'], row['EventNum'], row['Telescop'])
                     id_ = 'run_{}_evt_{}_tel_{}'.format(*id_)
+                    if source.startswith('SIM'):
+                        id_ = 'sim_' + id_
 
-                    if label is True:
+                    if label == True:
+                        # print(label, radius, id_)
                         if radius > 0.5:
                             data.append((id_, 1))
                         elif radius < 0.4:
                             data.append((id_, 0))
+                    # print(row['IsMuon'], row['MuRadius'])
             print(len(data))
 
             print('Uploading data')
+            print(query)
+            print(data)
             conn.executemany(query, data)
-        conn.commit()
+            conn.commit()
 
 
 if __name__ == '__main__':

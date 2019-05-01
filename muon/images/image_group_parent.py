@@ -193,8 +193,8 @@ class ImageGroupParent(StorageObject):
         if not os.path.isdir(image_path):
             os.mkdir(image_path)
         for image in tqdm(self.images.gen_iter(image_path)):
-            if image.plot(self.image_width, subject_storage,
-                          dpi=dpi, path=image_path):
+            if image.generate(self.image_width, subject_storage,
+                              dpi=dpi, path=image_path):
                 logger.info(image)
 
 

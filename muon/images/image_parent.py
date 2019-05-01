@@ -122,7 +122,8 @@ class ImageParent(StorageObject):
         """
         return 'muon_group_%d_id_%d.jpg' % (group_id, image_id)
 
-    def plot(self, width, subject_storage, dpi=None, quality=None, path=None):
+    def generate(self, width, subject_storage, dpi=None, quality=None,
+                 path=None):
         """
         Generate and save a plot of this image
         """
@@ -142,23 +143,11 @@ class ImageParent(StorageObject):
             if quality is None:
                 quality = 95
 
-            # subjects = subject_storage.get_subjects(self.subjects)
-            subjects = []
-            keys = set()
-            for s in self.subjects:
-                subject = subject_storage.get_subject(s)
-                if subject.id in keys:
-                    subject.id = subject.id+'-duplicate'
-                keys.add(subject.id)
-                subjects.append(subject)
-
-            offset = .5
             dpi = dpi or 50
-            fig, meta = Subjects(subjects).plot_subjects(
-                w=width, grid=True, grid_args={'offset': offset}, meta=True)
+            fig, meta = self.plot(width, subject_storage)
 
-
-            self.image_meta = Image.ImageMeta(dpi=dpi, offset=offset, **meta)
+            self.image_meta = self.__class__ \
+                .ImageMeta(dpi=dpi, **meta)
             # TODO make sure to actually update this data in the db
             # Probably need to add new columns
 
@@ -170,6 +159,25 @@ class ImageParent(StorageObject):
         except (KeyboardInterrupt, Exception):
             os.remove(fname)
             raise
+
+    def plot(self, width, subject_storage, fig=None):
+        subjects = []
+        keys = set()
+        for s in self.subjects:
+            subject = subject_storage.get_subject(s)
+            if subject.id in keys:
+                subject.id = subject.id+'-duplicate'
+            keys.add(subject.id)
+            subjects.append(subject)
+
+        subjects = Subjects(subjects)
+
+        offset = .5
+        fig, meta = Subjects(subjects).plot_subjects(
+            w=width, grid=True, grid_args={'offset': offset}, meta=True)
+
+        meta['offset'] = offset
+        return fig, meta
 
     def at_location(self, x, y):
         """

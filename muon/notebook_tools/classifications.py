@@ -5,14 +5,19 @@ import matplotlib
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import sklearn.metrics
+from pandas import DataFrame
+import logging
+from IPython.display import display
 
 from muon.database.database import Database
 from muon.project.parse_export import Aggregate, load_config
 
+logger = logging.getLogger(__name__)
 
-class ClassificationExport:
 
-    def __init__(self, agg_dump):
+class AggregationAnalysis:
+
+    def __init__(self, agg_dump, cleaned=True):
         with open(agg_dump, 'rb') as f:
             data = pickle.load(f)
 
@@ -23,6 +28,25 @@ class ClassificationExport:
         self.agg = agg
         self._labels = None
         self._metrics = None
+        self._cleaned = cleaned
+
+    def summary(self):
+        agg = self.agg
+        n_subjects = np.sum([len(agg.subjects[s]) for s in agg.subjects])
+        n_grids = np.sum([len(agg.images[s]) for s in agg.images])
+        metrics = self.metrics
+        print(metrics)
+
+        labels = []
+        data = []
+
+        labels += ['n_subjects', 'n_grids']
+        data += [n_subjects, n_grids]
+
+        metric_k = list(sorted(metrics.keys()))
+        labels += metric_k
+        data += ['{:.3f}'.format(metrics[k]) for k in metric_k]
+        return DataFrame(data, index=labels)
 
     def plot_n_grid(self, ax):
         N = np.array([len(self.agg.subjects[s]) for s in self.agg.subjects])
@@ -40,6 +64,7 @@ class ClassificationExport:
 
     def load_labels(self):
         database = Database()
+        logger.info('Loading labels')
 
         query = """
             SELECT subject_labels.subject_id, subject_labels.label
@@ -47,13 +72,19 @@ class ClassificationExport:
             INNER JOIN image_subjects
                 ON image_subjects.subject_id=subject_labels.subject_id
             WHERE image_subjects.group_id=13
+                AND subject_labels.label_name=?
         """
 
         labels = {}
 
+        if self._cleaned:
+            label_name = 'vegas_cleaned'
+        else:
+            label_name = 'vegas'
+
         reduced_subjects = {s: n for s, n in tqdm(self.agg.reduce_subjects())}
         with database.conn as conn:
-            cursor = conn.execute(query)
+            cursor = conn.execute(query, (label_name,))
             for subject_id, label in tqdm(cursor):
                 if subject_id in reduced_subjects:
                     labels[subject_id] = label
@@ -117,6 +148,18 @@ class ClassificationExport:
             plt.text(0.8, i, '{:.3f}'.format(j))
         plt.title('Volunteer Performance')
         plt.grid()
+
+    def plot_data_breakdown(self, ax):
+        labels = self.np_labels
+        print(labels)
+        muons = np.array([np.sum(labels[:,0]==1), np.sum(labels[:,0]==0)])
+        print(muons)
+        ax.barh(['Muon', 'Non-Muon'], muons)
+        pos = np.max(muons)*0.7
+        ax.text(pos, 0, '{:.1f}%'.format(muons[0]/labels.shape[0]*100))
+        ax.text(pos, 1, '{:.1f}%'.format(muons[1]/labels.shape[0]*100))
+        ax.grid()
+        ax.set_title('Simulated Event Breakdown')
 
     @property
     def subject_ids(self):

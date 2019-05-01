@@ -94,7 +94,7 @@ class Database:
                     CREATE INDEX IF NOT EXISTS subject_source_id
                         ON subjects (source_id);
                     CREATE INDEX IF NOT EXISTS subject_source
-                        ON subjects (source);
+                        ON subjects (source, subject_id);
 
 
 
