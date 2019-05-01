@@ -175,14 +175,12 @@ class ParseFits:
         run = int(row['RunNum'])
         evt = int(row['EventNum'])
         tel = int(row['Telescop'])
+        
+        source_id = 'run_{}_evt_{}_tel_{}' \
+            .format(run, evt, tel)
 
         if source.startswith('SIM'):
-            source_type = 'sim'
-        else:
-            source_type = 'real'
-        
-        source_id = '{}_run_{}_evt_{}_tel_{}' \
-            .format(source_type, run, evt, tel)
+            source_id = 'sim_' + source_id
 
         return Subject(None, charge, source_id, source=source, label=label)
     
