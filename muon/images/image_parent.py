@@ -160,7 +160,7 @@ class ImageParent(StorageObject):
             os.remove(fname)
             raise
 
-    def plot(self, width, subject_storage, fig=None):
+    def plot(self, width, subject_storage, fig=None, classifications=None):
         subjects = []
         keys = set()
         for s in self.subjects:
@@ -174,7 +174,8 @@ class ImageParent(StorageObject):
 
         offset = .5
         fig, meta = Subjects(subjects).plot_subjects(
-            w=width, grid=True, grid_args={'offset': offset}, meta=True)
+            w=width, grid=True, grid_args={'offset': offset}, meta=True,
+            classifications=classifications)
 
         meta['offset'] = offset
         return fig, meta

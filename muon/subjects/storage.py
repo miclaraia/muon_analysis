@@ -124,9 +124,6 @@ class Storage:
 
             return Subjects(subjects)
 
-        subjects = [self.get_subject(s) for s in tqdm(subjects)]
-        return Subjects(subjects)
-
     def get_split_subjects(self, split_name, batches=None):
         with self.conn as conn:
             if batches:

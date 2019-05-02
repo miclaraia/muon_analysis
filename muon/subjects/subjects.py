@@ -3,7 +3,10 @@ from collections import OrderedDict
 import numpy as np
 import random
 import math
+import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+from matplotlib.collections import PatchCollection
 import string
 
 from muon.utils.camera import Camera, CameraRotate
@@ -48,7 +51,8 @@ class Subjects:
 
     def plot_subjects(self, fig=None, w=5, camera=None,
                       grid=False, grid_args=None, meta=None,
-                      plot_text=None):
+                      plot_text=None,
+                      classifications=None):
         if camera is None:
             camera = Camera()
 
@@ -80,6 +84,9 @@ class Subjects:
                 grid_args = {}
             fig = self._plot_add_grid(fig, w, l, **grid_args)
 
+        if classifications is not None:
+            self._plot_add_classifications(fig, classifications)
+
         if meta:
             size = fig.get_size_inches()
             meta = {
@@ -92,6 +99,50 @@ class Subjects:
             return fig, meta
 
         return fig
+
+    @staticmethod
+    def _plot_add_classifications(fig, classification_matrix):
+        axes = fig.axes
+        for i in np.arange(classification_matrix.shape[1]):
+            ax = axes[i]
+            cmap = matplotlib.cm.get_cmap('tab20')
+
+            if sum(classification_matrix[:,i]) == 0:
+                continue
+
+            _a = 2        # box side length
+            _b = 3        # background buffer
+            _offset = 18  # offset from center
+            _w = 8        # n width of box
+            _l = 2        # linwidth of box border
+
+            dims = np.array([_w, np.floor(classification_matrix.shape[0]/_w)])
+            dims = dims*(_a+_l/2)+_b
+            w, h = dims
+
+            rect = Rectangle(
+                (-_offset, _offset+_b-h-1), w, h, facecolor='white', alpha=.8)
+            ax.add_patch(rect)
+
+            for j in np.arange(classification_matrix.shape[0]):
+                label = classification_matrix[j, i]
+                x = (j % _w)*(_a+_l/2) - _offset
+                y = -(j//_w)*(_a+_l/2) + _offset
+
+                if j <= 10:
+                    color = cmap(2*j)
+                else:
+                    color = cmap(j//2+1)
+
+                if label:
+                    rect = Rectangle(
+                        (x, y), _a, _a, linewidth=_l, facecolor=color,
+                        edgecolor=color)
+                else:
+                    rect = Rectangle(
+                        (x, y), _a, _a, linewidth=_l, edgecolor=color,
+                        facecolor='white')
+                ax.add_patch(rect)
 
     @staticmethod
     def _plot_add_grid(fig, w, l, offset=None):
