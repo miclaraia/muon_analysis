@@ -10,7 +10,7 @@ from muon.subjects.storage import Storage
 from muon.subjects.subject import Subject
 
 
-def get_subjects(conn, num, label, simulated):
+def get_subjects(conn, num, label, label_name, simulated):
     query = """
         CREATE TEMPORARY TABLE temp_muons (
             subject_id TEXT PRIMARY KEY,
@@ -25,14 +25,14 @@ def get_subjects(conn, num, label, simulated):
         FROM subjects AS S
         INNER JOIN subject_labels AS L ON S.subject_id=L.subject_id
         INNER JOIN sources ON sources.source_id=S.source
-        WHERE L.label_name="vegas_cleaned"
+        WHERE L.label_name=?
             AND L.label=?
             AND sources.source_type=?
         ;
     """
     simulated = {True: 1, False: 0}[simulated]
     print(query)
-    conn.execute(query, (label, simulated))
+    conn.execute(query, (label_name, label, simulated))
 
     query = """
         DELETE FROM temp_muons
@@ -56,11 +56,12 @@ def get_subjects(conn, num, label, simulated):
         FROM temp_muons
         INNER JOIN subjects as S ON S.subject_id=temp_muons.subject_id
         INNER JOIN subject_labels AS L ON S.subject_id=L.subject_id
-        WHERE L.label_name="vegas_cleaned"
+        WHERE L.label_name=?
         ORDER BY rand
         LIMIT ?
     """
-    cursor = conn.execute(query, (num,))
+    print(query)
+    cursor = conn.execute(query, (label_name, num,))
 
     for row in cursor:
         fields = ['subject_id', 'charge', 'label', 'source_id', 'source_file']
@@ -108,24 +109,32 @@ def main(save_dir):
 
     muon_dir = os.path.join(save_dir, 'muons')
     nonmuon_dir = os.path.join(save_dir, 'nonmuons')
+    nonmuon2_dir = os.path.join(save_dir, 'nonmuons-2')
 
     # if os.path.isdir(muon_dir):
         # print(muon_dir)
         # raise Exception('Muon path already exists')
-    if os.path.isdir(nonmuon_dir):
-        print(nonmuon_dir)
-        raise Exception('Nonmuon path already exists')
+    # if os.path.isdir(nonmuon_dir):
+        # print(nonmuon_dir)
+        # raise Exception('Nonmuon path already exists')
+    if os.path.isdir(nonmuon2_dir):
+        print(nonmuon2_dir)
+        raise Exception('Nonmuon2 path already exists')
 
     database = Database()
 
     with database.conn as conn:
-        # subjects = get_subjects(conn, n_muons, 1, False)
+        # subjects = get_subjects(conn, n_muons, 1, 'vegas_cleaned', False)
         # manifest = os.path.join(save_dir, 'muon-manifest.csv')
         # generate(subjects, muon_dir, manifest)
 
-        subjects = get_subjects(conn, n_nonmuons, 0, False)
-        manifest = os.path.join(save_dir, 'nonmuon-manifest.csv')
-        generate(subjects, nonmuon_dir, manifest)
+        # subjects = get_subjects(conn, n_nonmuons, 0, 'vegas_cleaned', False)
+        # manifest = os.path.join(save_dir, 'nonmuon-manifest.csv')
+        # generate(subjects, nonmuon_dir, manifest)
+
+        subjects = get_subjects(conn, n_nonmuons, 0, 'vegas', False)
+        manifest = os.path.join(save_dir, 'nonmuon-2-manifest.csv')
+        generate(subjects, nonmuon2_dir, manifest)
             
 
 
