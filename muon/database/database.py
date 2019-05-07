@@ -127,6 +127,7 @@ class Database:
 
                 CREATE TABLE IF NOT EXISTS sources (
                     source_id TEXT PRIMARY KEY,
+                    source_type INTEGER NOT NULL,
                     hash TEXT NOT NULL,
                     updated TIMESTAMP NOT NULL
                 );
@@ -269,7 +270,6 @@ class Database:
                     id=row[0],
                     charge=np.fromstring(row[1], dtype=np.float32)
                 )
-
 
         @classmethod
         def get_subject_label(cls, conn, subject_id, label_name):
