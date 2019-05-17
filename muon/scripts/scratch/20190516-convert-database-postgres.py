@@ -37,7 +37,16 @@ def main(sqlite_file):
             'job_id', 'image_id'],
     }
 
+    skip = [
+        'images',
+        'image_subjects',
+        'image_groups',
+        'sources',
+    ]
+
     for table in sorted(fields):
+        if table in skip:
+            continue
         transfer_general(table, sql_conn, pg_conn, fields[table])
         pg_conn.commit()
 

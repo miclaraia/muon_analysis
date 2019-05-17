@@ -54,7 +54,15 @@ CREATE TABLE IF NOT EXISTS subject_labels (
     subject_id UUID NOT NULL,
     label_name TEXT NOT NULL,
     label INTEGER NOT NULL
-);
+    )
+    -- PARTITION BY LIST (label_name)
+    UNIQUE (label_name, subject_id);
+
+-- CREATE TABLE IF NOT EXISTS subject_labels_vegas
+    -- PARITITON OF subject_labels FOR VALUES IN ('vegas');
+
+-- CREATE TABLE IF NOT EXISTS subject_labels_vegas_cleaned
+    -- PARTITION OF subject_labels FOR VALUES IN ('vegas_cleaned');
 
 CREATE TABLE IF NOT EXISTS sources (
     source_id TEXT PRIMARY KEY,
@@ -103,10 +111,10 @@ CREATE INDEX IF NOT EXISTS id_cluster
 
 /* ** Subject Labels ***************************** */
 
-CREATE INDEX IF NOT EXISTS subject_label
+CREATE INDEX IF NOT EXISTS subject_labels
+    ON subject_labels (label, subject_id);
+CREATE INDEX IF NOT EXISTS subject_label_id
     ON subject_labels (subject_id);
-CREATE INDEX IF NOT EXISTS subject_label_names
-    ON subject_labels (label_name, subject_id);
 
 /* ** Workers ************************************ */
 

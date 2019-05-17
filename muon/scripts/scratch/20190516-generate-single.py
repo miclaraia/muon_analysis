@@ -15,6 +15,15 @@ from muon.images.image_group_single import SingleImageGroup
     as in the classifier should not have been trained on
     any of these images.
     5,000 should be real data, and 5,000 should be simulated
+
+    In each of these sets, this will sample a specific subset based on
+    existing labels.
+    1/8: cleaned muon
+    1/8: cleaned nonmuon
+    remaining: original labels, nonmuon
+
+    Randomly sampling did not put enough muons in the data set from the cleaned
+    labels (7/10000).
 """
 
 
@@ -35,10 +44,10 @@ def get_subjects(conn, num, groups):
         INNER JOIN images AS I ON I_S.image_id=I.image_id
         WHERE
             S.split_id=1
-            AND I.group_id IN (%s)
+            AND I.group_id IN ({})
         GROUP BY I_S.subject_id
         ;
-    """ % ','.join(['?' for _ in groups])
+    """.format(','.join(['%s' for _ in groups]))
 
     print(query)
     conn.execute(query, tuple(groups))
@@ -47,17 +56,40 @@ def get_subjects(conn, num, groups):
     # for row in cursor:
         # print(row)
 
+    count = 0
     query = """
-        SELECT subject_id FROM temp_muons ORDER BY rand LIMIT ?
+        SELECT T.subject_id FROM temp_muons as T
+        INNER JOIN subject_labels AS L ON T.subject_id=L.subject_id
+        WHERE L.label_name=%s and L.label=%s
+        ORDER BY T.rand LIMIT %s
     """
     print(query)
-    cursor = conn.execute(query, (num,))
+    with conn.cursor() as cursor:
+        cursor.execute(query, ('vegas_cleaned', 1, num//8,))
 
-    for row in cursor:
-        yield row[0]
+        for row in cursor:
+            count += 1
+            yield row[0]
+
+    with conn.cursor() as cursor:
+        cursor.execute(query, ('vegas_cleaned', 0, num//8,))
+
+        for row in cursor:
+            count += 1
+            yield row[0]
+
+    with conn.cursor() as cursor:
+        cursor.execute(query, ('vegas', 0, num - count,))
+
+        for row in cursor:
+            count += 1
+            if count > num:
+                break
+            yield row[0]
 
     query = "DROP TABLE temp_muons"
-    conn.execute(query)
+    with conn.cursor() as cursor:
+        cursor.execute(query)
 
 
 @click.group()
