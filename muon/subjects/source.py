@@ -12,6 +12,7 @@ class Source(StorageObject):
 
     hash = StorageAttribute('hash')
     updated = StorageAttribute('updated')
+    source_type = StorageAttribute('source_type')
 
     def __init__(self, source_id, database, attrs=None, online=False):
         # fname, hash=None, updated=None):
@@ -29,13 +30,21 @@ class Source(StorageObject):
 
         storage = [
             StoredAttribute('hash', attrs['hash']),
-            StoredAttribute('updated', attrs['updated'])]
+            StoredAttribute('updated', attrs['updated']),
+            StoredAttribute('source_type', attrs['source_type']),
+        ]
         self.storage = {s.name: s for s in storage}
 
     @classmethod
     def new(cls, source_id, database, location):
+        if 'SIM' in source_id:
+            source_type = 1
+        else:
+            source_type = 0
+
         hash_ = cls._get_hash(location, source_id)
-        attrs = {'hash': hash_, 'updated': datetime.now()}
+        attrs = {'hash': hash_, 'updated': datetime.now(),
+                 'source_type': source_type}
         source = cls(source_id, database, attrs)
 
         with database.conn as conn:
@@ -79,7 +88,9 @@ class Source(StorageObject):
         return self._get_hash(location, self.source_id) == self.hash
 
     def __str__(self):
-        return '{} {} {}'.format(self.source_id, self.hash, self.updated)
+        source_type = {1: 'sim', 0: 'real'}[self.source_type]
+        return '{} {} {} {}'.format(
+            self.source_id, source_type, self.hash, self.updated)
 
     def __repr__(self):
         return str(self)
