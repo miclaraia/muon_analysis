@@ -48,6 +48,7 @@ setup(
         'astropy',
         'pillow',
         'sqlite3',
+        'psycopg2',
     ],
     extras_require={
         'clustering': ['dec-keras', 'redec-keras']

@@ -11,6 +11,12 @@ storage:
   database: 'MUOND/subjects-main/data-main.db'
   images: 'MUOND/images/mh2-images-main/'
 
+database:
+  host: 'localhost'
+  dbname: 'muon_data'
+  username: null
+  password: null
+
 classification:
   tool_name: 'Tool name'
   task_A: 'T0'

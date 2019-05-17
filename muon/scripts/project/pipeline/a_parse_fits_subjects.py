@@ -50,7 +50,7 @@ def cli():
 
 
 @cli.command()
-@click.argument('manifest')
+@click.argument('input_file')
 @click.option('--config')
 @click.option('--batch', nargs=1, type=int)
 def one(input_file, config, batch):

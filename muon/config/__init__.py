@@ -119,6 +119,29 @@ class Storage(SubConfig):
         return self._pre(self._config['images'])
 
 
+class Database(SubConfig):
+
+    @property
+    def _config(self):
+        return self.config['database']
+
+    @property
+    def host(self):
+        return self._config['host']
+
+    @property
+    def dbname(self):
+        return self._config['dbname']
+
+    @property
+    def username(self):
+        return self._config['username']
+
+    @property
+    def password(self):
+        return self._config['password']
+
+
 class Classification(SubConfig):
 
     @property

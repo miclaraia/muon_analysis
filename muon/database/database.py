@@ -1,4 +1,4 @@
-import sqlite3
+import psycopg2
 import os
 import numpy as np
 import json
@@ -13,149 +13,64 @@ logger = logging.getLogger(__name__)
 
 class Database:
 
-    def __init__(self, fname=None):
-        if fname is None:
-            fname = Config.instance().storage.database
-        self.fname = fname
+    def __init__(self, host=None, dbname=None, username=None, password=None):
+        config = Config.instance().database
 
-        if not os.path.isfile(fname):
-            self.create_db()
+        db_kwargs.update({
+            'host': config.host,
+            'database': config.dbname,
+            'username': config.username,
+            'password': config.password
+        })
+
+        db_update = {
+            'host': host,
+            'database': dbname,
+            'username': username,
+            'password': password
+        }
+        for k, v in db_update.items():
+            if v is not None:
+                db_kwargs[k] = v
+
+        self.db_kwargs = db_kwargs
 
     @property
     def conn(self):
-        return self.__class__.Connection(self.fname)
-        # return sqlite3.connect(self.fname)
-
+        return self.__class__.Connection(**self.db_kwargs)
 
     def create_db(self):
+        fname = os.path.dirname(__file__)
+        fname = os.path.join(fname, 'schema_postgres.sql')
+        with open(fname, 'r') as f:
+            query = f.read()
+
+        logger.info('Running db schema')
+        queries = query.split(';')
+
         with self.conn as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
 
-#         Tables:
-#             Images
-#                 image_id, group_id, metadata, zoo_id
-#             ImageSubjects
-#                 subject_id, image_id, image_location details
-#             ImageGroups
-#                 group_id, metadata->(size, dim, group, description)
-            query = """
-                CREATE TABLE IF NOT EXISTS images (
-                    image_id integer PIMARY KEY,
-                    group_id integer,
-                    cluster integer,
-                    metadata text NOT NULL,
-                    zoo_id integer,
-                    fig_dpi integer,
-                    fig_offset integer,
-                    fig_height integer,
-                    fig_width integer,
-                    fig_rows integer,
-                    fig_cols integer
-                );
-
-                CREATE TABLE IF NOT EXISTS image_subjects (
-                    subject_id TEXT NOT NULL,
-                    image_id integer,
-                    group_id integer,
-                    image_index integer
-                );
-                    CREATE INDEX image_subjects_id
-                    ON image_subjects (image_id, image_index);
-
-
-                CREATE TABLE IF NOT EXISTS image_groups (
-                    group_id integer PRIMARY KEY,
-                    group_type integer NOT NULL,
-                    cluster_name TEXT NOT NULL,
-                    image_count integer,
-                    image_size integer,
-                    image_width integer,
-                    description text,
-                    permutations integer
-                );
-
-                CREATE TABLE IF NOT EXISTS subjects (
-                    subject_id TEXT PRIMARY KEY, -- assigned subject id
-
-                    /* source run, event, and telescope id
-                       store as run_event_tel */
-                    source_id text NOT NULL,
-                    source TEXT NOT NULL, -- source filename
-
-                    charge BLOB,
-                    batch_id INTEGER, -- group subjects in batches
-                    split_id INTEGER DEFAULT 0 -- which split group for training
-                );
-                    CREATE INDEX IF NOT EXISTS subject_batch
-                        ON subjects (batch_id, subject_id);
-                    CREATE INDEX IF NOT EXISTS subject_batch_split
-                        ON subjects (batch_id, split_id);
-                    CREATE INDEX IF NOT EXISTS subject_split
-                        ON subjects (split_id);
-                    CREATE INDEX IF NOT EXISTS subject_source_id
-                        ON subjects (source_id);
-                    CREATE INDEX IF NOT EXISTS subject_source
-                        ON subjects (source, subject_id);
-
-
-
-                /*CREATE TABLE IF NOT EXISTS clustering (
-                    subject_id TEXT PRIMARY KEY,
-                    cluster integer,
-                    is_test boolean DEFAULT 0,
-                    split integer
-                );*/
-
-                CREATE TABLE IF NOT EXISTS subject_clusters (
-                    subject_id TEXT NOT NULL,
-                    cluster_name TEXT NOT NULL,
-                    cluster INTEGER
-                );
-
-                    CREATE INDEX IF NOT EXISTS id_cluster
-                        ON subject_clusters (cluster_name, subject_id);
-
-                CREATE TABLE IF NOT EXISTS subject_labels (
-                    subject_id TEXT NOT NULL,
-                    label_name text,
-                    label integer
-                );
-
-                    CREATE INDEX IF NOT EXISTS subject_label
-                        ON subject_labels (subject_id);
-                    CREATE INDEX IF NOT EXISTS subject_label_names
-                        ON subject_labels (label_name, subject_id);
-
-                CREATE TABLE IF NOT EXISTS sources (
-                    source_id TEXT PRIMARY KEY,
-                    source_type INTEGER NOT NULL,
-                    hash TEXT NOT NULL,
-                    updated TIMESTAMP NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS workers (
-                    job_id INTEGER PRIMARY KEY,
-                    job_type TEXT,
-                    job_status INTEGER
-                );
-
-                CREATE TABLE IF NOT EXISTS worker_images (
-                    job_id INTEGER,
-                    image_id INTEGER
-                );
-                CREATE INDEX IF NOT EXISTS worker_image_job
-                    ON worker_images (job_id);
-            """
-            print(query)
-            conn.executescript(query)
+            conn.commit()
 
     class Connection:
 
-        def __init__(self, fname):
-            self.fname = fname
+        def __init__(self, host, database, username, password):
+            self.host = host
+            self.database = database
+            self.username = username
+            self.password = password
+
             self.conn = None
 
         def __enter__(self):
-            self.conn = sqlite3.connect(self.fname, timeout=60)
+            self.conn = psycopg2.connect(
+                host=self.host,
+                user=self.username,
+                password=self.password,
+                database=self.database)
+
             return self.conn
 
         def __exit__(self, type, value, traceback):
@@ -163,24 +78,17 @@ class Database:
 
 
     class Subject:
-        _splits = {k: i for i, k in \
-                enumerate(['train', 'test', 'valid', 'train_dev'])}
+        _splits = {k: i for i, k in
+                   enumerate(['train', 'test', 'valid', 'train_dev'])}
 
         @classmethod
         def next_batch(cls, conn):
-            cursor = conn.execute('SELECT MAX(batch_id) FROM subjects')
-            last_id = cursor.fetchone()[0]
-            if last_id is None:
-                return 0
-            return last_id + 1
-
-        # @classmethod
-        # def next_id(cls, conn):
-            # cursor = conn.execute('SELECT MAX(subject_id) FROM subjects')
-            # last_id = cursor.fetchone()[0]
-            # if last_id is None:
-                # return 0
-            # return last_id + 1
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT MAX(batch_id) FROM subjects')
+                last_id = cursor.fetchone()[0]
+                if last_id is None:
+                    return 0
+                return last_id + 1
 
         @classmethod
         def add_subject(cls, conn, subject, batch_id, split_name):
@@ -198,8 +106,10 @@ class Database:
             keys, values = zip(*data.items())
 
             query = 'INSERT INTO subjects ({}) VALUES ({})'.format(
-                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
-            conn.execute(query, values)
+                    ','.join(keys), ','.join(['%s' for _ in range(len(keys))]))
+
+            with conn.cursor() as cursor:
+                cursor.execute(query, values)
 
             return subject.id
 
@@ -213,19 +123,22 @@ class Database:
             keys, values = zip(*data.items())
 
             query = 'INSERT INTO subject_labels ({}) VALUES ({})'.format(
-                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
-            conn.execute(query, values)
+                    ','.join(keys), ','.join(['%s' for _ in range(len(keys))]))
+
+            with conn.cursor() as cursor:
+                cursor.execute(query, values)
 
 
         ### Getting Subjects #########################
 
         @classmethod
         def get_subject(cls, conn, subject_id):
-            cursor = conn.execute("""
-                SELECT subject_id, charge FROM subjects
-                WHERE subject_id=?""", (subject_id,))
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT subject_id, charge FROM subjects
+                    WHERE subject_id=%s""", (subject_id,))
 
-            row = cursor.fetchone()
+                row = cursor.fetchone()
             return Subject(
                 id=row[0],
                 charge=np.fromstring(row[1], dtype=np.float32)
@@ -233,22 +146,27 @@ class Database:
 
         @classmethod
         def get_subject_ids_in_batch(cls, conn, batch_id):
-            cursor = conn.execute("""
-                SELECT subject_id FROM subjects WHERE batch_id=?
-                """, (batch_id,))
-            for row in cursor:
-                yield row[0]
+            with conn.cursor() as cursor:
+                query = """
+                    SELECT subject_id FROM subjects WHERE batch_id=%s
+                """
+                cursor.execute(query, (batch_id,))
+
+                for row in cursor:
+                    yield row[0]
 
         @classmethod
         def get_subject_batch(cls, conn, batch_id):
-            cursor = conn.execute("""
-                SELECT subject_id, charge FROM subjects
-                WHERE batch_id=?""", (batch_id,))
-            for row in cursor:
-                yield Subject(
-                    id=row[0],
-                    charge=np.fromstring(row[1], dtype=np.float32)
-                )
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT subject_id, charge FROM subjects
+                    WHERE batch_id=%s
+                    """, (batch_id,))
+
+                for row in cursor:
+                    yield Subject(
+                        id=row[0],
+                        charge=np.fromstring(row[1], dtype=np.float32))
 
         @classmethod
         def get_subject_batches(cls, conn, batches):
@@ -280,74 +198,84 @@ class Database:
 
         @classmethod
         def get_all_subjects(cls, conn):
-            cursor = conn.execute(
-                'SELECT subject_id, charge FROM subjects')
-            for row in cursor:
-                yield Subject(
-                    id=row[0],
-                    charge=np.fromstring(row[1], dtype=np.float32)
-                )
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT subject_id, charge FROM subjects')
+                for row in cursor:
+                    yield Subject(
+                        id=row[0],
+                        charge=np.fromstring(row[1], dtype=np.float32)
+                    )
 
         @classmethod
         def get_subject_label(cls, conn, subject_id, label_name):
-            cursor = conn.execute("""
-                SELECT label FROM subject_labels WHERE
-                subject_id=? AND label_name=?""", (subject_id, label_name))
-            return cursor.fetchone()[0]
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT label FROM subject_labels WHERE
+                    subject_id=%s AND label_name=%s""", (subject_id, label_name))
+                return cursor.fetchone()[0]
 
         @classmethod
         def get_source_subject(cls, conn, source_id):
-            cursor = conn.execute("""
-                SELECT subject_id FROM subjects
-                WHERE source_id=?""", (source_id,))
-            row = cursor.fetchone()
-            if row:
-                return row[0]
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT subject_id FROM subjects
+                    WHERE source_id=%s""", (source_id,))
+                row = cursor.fetchone()
+                if row:
+                    return row[0]
 
         @classmethod
         def list_label_names(cls, conn):
-            cursor = conn.execute(
-                'SELECT label_name FROM subject_labels GROUP BY label_name')
-            return [row[0] for row in cursor]
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT label_name FROM subject_labels GROUP BY label_name')
+                return [row[0] for row in cursor]
 
         @classmethod
         def list_labeled_subjects(self, conn, label_name):
-            cursor = conn.execute(
-                'SELECT subject_id FROM subject_labels WHERE label_name=?',
-                label_name)
-            return [row[0] for row in cursor]
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT subject_id FROM subject_labels WHERE label_name=%s',
+                    label_name)
+                return [row[0] for row in cursor]
 
         @classmethod
         def list_subjects(self, conn):
-            cursor = conn.execute('SELECT subject_id FROM subjects')
-            return [row[0] for row in cursor]
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT subject_id FROM subjects')
+                for row in cursor:
+                    yield row[0]
 
         @classmethod
         def set_subject_split(cls, conn, subject_id, split_name):
-            split_id = cls._splits[split_name]
-            conn.execute("""
-                UPDATE subjects SET split_id=?
-                WHERE subject_id=?""", (split_id, subject_id)
-                )
+            with conn.cursor() as cursor:
+                split_id = cls._splits[split_name]
+                cursor.execute("""
+                    UPDATE subjects SET split_id=%s
+                    WHERE subject_id=%s""", (split_id, subject_id)
+                    )
 
         @classmethod
         def get_split_subjects(cls, conn, split_name):
             split_id = cls._splits[split_name]
-            cursor = conn.execute(
-                'SELECT subject_id FROM subjects WHERE split_id=?',
-                (split_id,))
-            for row in cursor:
-                yield row[0]
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT subject_id FROM subjects WHERE split_id=%s',
+                    (split_id,))
+                for row in cursor:
+                    yield row[0]
 
         @classmethod
         def get_split_subjects_batch(cls, conn, split_name, batch_id):
             split_id = cls._splits[split_name]
-            cursor = conn.execute("""
-                SELECT subject_id FROM subjects
-                WHERE split_id=? and batch_id=?
-                """, (split_id, batch_id))
-            for row in cursor:
-                yield row[0]
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT subject_id FROM subjects
+                    WHERE split_id=%s and batch_id=%s
+                    """, (split_id, batch_id))
+                for row in cursor:
+                    yield row[0]
 
         @classmethod
         def get_split_subjects_batches(cls, conn, split_name, batches):
@@ -360,72 +288,79 @@ class Database:
 
         @classmethod
         def add_subject_cluster(cls, conn, subject_id, cluster_name, cluster):
-            conn.execute("""
-                DELETE FROM subject_clusters
-                WHERE subject_id=? AND cluster_name=?""",
-                (subject_id, cluster_name))
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM subject_clusters
+                    WHERE subject_id=%s AND cluster_name=%s""",
+                    (subject_id, cluster_name))
 
-            conn.execute("""
-                INSERT INTO subject_clusters
-                (subject_id, cluster_name, cluster)
-                VALUES (?,?,?)""", (subject_id, cluster_name, cluster))
+                cursor.execute("""
+                    INSERT INTO subject_clusters
+                    (subject_id, cluster_name, cluster)
+                    VALUES (%s,%s,%s)""", (subject_id, cluster_name, cluster))
 
         @classmethod
         def get_cluster_assignments(cls, conn, cluster_name, batch=None):
-            if batch:
-                cursor = conn.execute("""
-                    SELECT subject_clusters.subject_id, subject_clusters.cluster
-                    FROM subject_clusters
-                    INNER JOIN subjects
-                        ON subject_clusters.subject_id=subjects.subject_id
-                    WHERE
-                        cluster_name=?
-                        AND subjects.batch_id=?
-                    """, (cluster_name, batch))
-            else:
-                cursor = conn.execute("""
-                    SELECT subject_id, cluster FROM subject_clusters
-                    WHERE cluster_name=?""", (cluster_name,))
+            with conn.cursor() as cursor:
+                if batch:
+                    cursor.execute("""
+                        SELECT subject_clusters.subject_id,
+                               subject_clusters.cluster
+                        FROM subject_clusters
+                        INNER JOIN subjects
+                            ON subject_clusters.subject_id=subjects.subject_id
+                        WHERE
+                            cluster_name=%s
+                            AND subjects.batch_id=%s
+                        """, (cluster_name, batch))
+                else:
+                    cursor.execute("""
+                        SELECT subject_id, cluster FROM subject_clusters
+                        WHERE cluster_name=%s""", (cluster_name,))
 
-            clusters = {}
-            for subject_id, cluster in tqdm(cursor):
-                if cluster not in clusters:
-                    clusters[cluster] = []
-                clusters[cluster].append(subject_id)
-            return clusters
+                clusters = {}
+                for subject_id, cluster in tqdm(cursor):
+                    if cluster not in clusters:
+                        clusters[cluster] = []
+                    clusters[cluster].append(subject_id)
+                return clusters
 
         @classmethod
         def get_cluster_labels(cls, conn, cluster_name, label_name):
-            cursor = conn.execute("""
-                SELECT subject_clusters.cluster, 
-                    subject_clusters.subject_id, subject_labels.label
-                    FROM subject_clusters
-                INNER JOIN subject_labels
-                    ON subject_clusters.subject_id=subject_labels.subject_id
-                WHERE subject_clusters.cluster_name=? 
-                    AND subject_labels.label_name=?
-                ORDER BY subject_clusters.cluster ASC""",
-                (cluster_name, label_name,))
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT subject_clusters.cluster, 
+                        subject_clusters.subject_id, subject_labels.label
+                        FROM subject_clusters
+                    INNER JOIN subject_labels
+                        ON subject_clusters.subject_id=subject_labels.subject_id
+                    WHERE subject_clusters.cluster_name=%s 
+                        AND subject_labels.label_name=%s
+                    ORDER BY subject_clusters.cluster ASC""",
+                    (cluster_name, label_name,))
 
-            for row in cursor:
-                yield row
+                for row in cursor:
+                    yield row
 
         @classmethod
         def get_cluster_subjects(cls, conn, cluster_name, cluster):
-            cursor = conn.execute("""
-                SELECT subject_id FROM subject_clusters
-                WHERE cluster_name=? AND cluster=?""",
-                (cluster_name, cluster))
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT subject_id FROM subject_clusters
+                    WHERE cluster_name=%s AND cluster=%s""",
+                    (cluster_name, cluster))
 
-            for row in cursor:
-                yield row[0]
+                for row in cursor:
+                    yield row[0]
 
     class Image:
 
         @classmethod
         def next_id(cls, conn):
-            cursor = conn.execute('SELECT MAX(image_id) FROM images')
-            last_id = cursor.fetchone()[0]
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT MAX(image_id) FROM images')
+                last_id = cursor.fetchone()[0]
+
             if last_id is None:
                 return 2000
             return last_id + 1
@@ -452,15 +387,17 @@ class Database:
             keys, values = zip(*data.items())
 
             query = 'INSERT INTO images ({}) VALUES ({})'.format(
-                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
-            conn.execute(query, values)
+                    ','.join(keys), ','.join(['%s' for _ in range(len(keys))]))
 
-            for i, subject_id in enumerate(image.subjects):
-                conn.execute("""
-                    INSERT INTO image_subjects
-                    (subject_id, image_id, group_id, image_index)
-                    VALUES (?,?,?,?)""",
-                    (subject_id, image.image_id, image.group_id, i))
+            with conn.cursor() as cursor:
+                cursor.execute(query, values)
+
+                for i, subject_id in enumerate(image.subjects):
+                    cursor.execute("""
+                        INSERT INTO image_subjects
+                        (subject_id, image_id, group_id, image_index)
+                        VALUES (%s,%s,%s,%s)""",
+                        (subject_id, image.image_id, image.group_id, i))
 
             return image.image_id
 
@@ -469,51 +406,17 @@ class Database:
             query_args = []
             args = []
             for k in updates:
-                query_args.append('{}=?'.format(k))
+                query_args.append('{}=%s'.format(k))
                 args.append(updates[k])
             query = """
                 UPDATE images
                 SET {}
-                WHERE image_id=?
+                WHERE image_id=%s
                 """.format(','.join(query_args))
 
             args.append(image_id)
-            conn.execute(query, args)
-
-        # @classmethod
-        # def get_image(cls, conn, image_id):
-            # fields = [
-                # 'group_id',
-                # 'cluster',
-                # 'metadata',
-                # 'zoo_id',
-                # 'fig_dpi',
-                # 'fig_offset',
-                # 'fig_height',
-                # 'fig_width',
-                # 'fig_rows',
-                # 'fig_cols'
-                # ]
-
-            # cursor = conn.execute("""
-                # SELECT {}
-                # FROM images WHERE image_id=?""".format(','.join(fields)),
-                # (image_id,))
-            # row = cursor.fetchone()
-            # row = {fields[i]: v for i, v in enumerate(row)}
-
-            # image_attrs = {}
-            # fig_attrs = {}
-            # for field in fields:
-                # if 'fig_' in field:
-                    # fig_attrs[field[4:]] = row[field]
-                # elif field == 'metadata':
-                    # image_attrs[field] = json.loads(row[field])
-                # else:
-                    # image_attrs[field] = row[field]
-
-            # image_attrs['image_meta'] = fig_attrs
-            # return image_attrs
+            with conn.cursor() as cursor:
+                cursor.execute(query, args)
 
         @classmethod
         def _parse_image_row(cls, row):
@@ -531,8 +434,8 @@ class Database:
                 'fig_cols',
                 'subjects'
                 ]
+
             kwargs = {f: row[i] for i, f in enumerate(fields)}
-            kwargs['subjects'] = row[-1].split(',')
 
             image_attrs = {}
             fig_attrs = {}
@@ -549,13 +452,14 @@ class Database:
             return image_attrs
 
         @classmethod
-        def _build_get_query(cls, where=None, exclude_zoo=False, shuffle=False):
+        def _build_get_query(cls, where=None, exclude_zoo=False,
+                             shuffle=False):
             if where is None:
                 where = 'image_id'
             if where == 'image_id':
-                where = 'WHERE images.image_id=?'
+                where = 'WHERE images.image_id=%s'
             elif where == 'group_id':
-                where = 'WHERE images.group_id=?'
+                where = 'WHERE images.group_id=%s'
                 if exclude_zoo:
                     where += ' AND images.zoo_id IS NULL'
 
@@ -576,7 +480,7 @@ class Database:
                 'fig_width',
                 'fig_rows',
                 'fig_cols',
-                'GROUP_CONCAT(image_subjects.subject_id)'
+                'ARRAY_AGG(image_subjects.subject_id)'
                 ])
 
             query = """
@@ -593,31 +497,37 @@ class Database:
         @classmethod
         def get_images(cls, conn, image_ids):
             query = cls._build_get_query(where='image_id')
-            cursor = conn.executemany(query, (image_ids,))
-            for row in cursor:
-                yield cls._parse_image_row(row)
+            with conn.cursor() as cursor:
+                cursor.executemany(query, image_ids)
+
+                for row in cursor:
+                    yield cls._parse_image_row(row)
 
         @classmethod
         def get_image(cls, conn, image_id):
             query = cls._build_get_query(where='image_id')
-            cursor = conn.execute(query, (image_id,))
-            row = cursor.fetchone()
-            return cls._parse_image_row(row)
+            with conn.cursor() as cursor:
+                cursor.execute(query, (image_id,))
+
+                row = cursor.fetchone()
+                return cls._parse_image_row(row)
 
         @classmethod
         def get_group_images(cls, conn, group_id,
                              exclude_zoo=False, shuffle=False):
             query = cls._build_get_query(
                 where='group_id', exclude_zoo=exclude_zoo)
-            cursor = conn.execute(query, (group_id,))
-            for row in cursor:
-                yield cls._parse_image_row(row)
+
+            with conn.cursor() as cursor:
+                cursor.execute(query, (group_id,))
+                for row in cursor:
+                    yield cls._parse_image_row(row)
 
         @classmethod
         def get_group_images_batched(
                 cls, conn, group_id, batch_size,
                 exclude_zoo=False, shuffle=False):
-            logger.debug(1)
+
             image_ids = cls.get_group_image_ids(
                 conn, group_id,
                 exclude_zoo=exclude_zoo,
@@ -628,56 +538,52 @@ class Database:
                 where='image_id', exclude_zoo=exclude_zoo)
             for batch in np.array_split(np.array(image_ids), batch_size):
                 query_sub = '({})'.format(
-                    ','.join(['?' for _ in range(len(batch))]))
+                    ','.join(['%s' for _ in range(len(batch))]))
                 query_ = query.replace(
-                    'image_id=?', 'image_id IN {}'.format(query_sub))
+                    'image_id=%s', 'image_id IN {}'.format(query_sub))
                 logger.debug(query_)
-                cursor = conn.execute(query_, list(batch))
-                for row in cursor:
-                    yield cls._parse_image_row(row)
-                # for row in cls.get_images(conn, list(batch)):
-                    # yield row
-                
 
-
-            # query = cls._build_get_query(
-                # where='group_id', exclude_zoo=exclude_zoo)
-            # cursor = conn.execute(query, (group_id,))
-            # for row in cursor:
-                # yield cls._parse_image_row(row)
+                with conn.cursor() as cursor:
+                    cursor.execute(query_, list(batch))
+                    for row in cursor:
+                        yield cls._parse_image_row(row)
 
         @classmethod
         def get_group_image_ids(cls, conn, group_id,
                                 exclude_zoo=False, shuffle=False):
             query = """
                 SELECT image_id FROM images
-                WHERE group_id=?
+                WHERE group_id=%s
             """
             if exclude_zoo:
                 query += " AND zoo_id IS NULL"
             if shuffle:
                 query += " ORDER BY RANDOM()"
 
-            cursor = conn.execute(query, (group_id,))
-            for row in cursor:
-                yield row[0]
+            with conn.cursor() as cursor:
+                cursor.execute(query, (group_id,))
+                for row in cursor:
+                    yield row[0]
 
         @classmethod
         def get_image_subjects(cls, conn, image_id):
-            cursor = conn.execute("""
-                SELECT subject_id FROM image_subjects
-                WHERE image_id=?
-                ORDER BY image_index ASC""", (image_id,))
-            for row in cursor:
-                yield row[0]
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT subject_id FROM image_subjects
+                    WHERE image_id=%s
+                    ORDER BY image_index ASC""", (image_id,))
+                for row in cursor:
+                    yield row[0]
 
     class ImageGroup:
         # TODO add update methods
 
         @classmethod
         def next_id(cls, conn):
-            cursor = conn.execute('SELECT MAX(group_id) FROM image_groups')
-            last_id = cursor.fetchone()[0]
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT MAX(group_id) FROM image_groups')
+                last_id = cursor.fetchone()[0]
+
             if last_id is None:
                 return 10
             return last_id + 1
@@ -685,9 +591,10 @@ class Database:
         @classmethod
         def delete_group(cls, conn, group_id):
             print('Deleting group:', group_id, type(group_id))
-            conn.execute('DELETE FROM image_groups WHERE group_id=?', (group_id,))
-            conn.execute('DELETE FROM images WHERE group_id=?', (group_id,))
-            conn.execute('DELETE FROM image_subjects WHERE group_id=?', (group_id,))
+            with conn.cursor() as cursor:
+                cursor.execute('DELETE FROM image_groups WHERE group_id=%s', (group_id,))
+                cursor.execute('DELETE FROM images WHERE group_id=%s', (group_id,))
+                cursor.execute('DELETE FROM image_subjects WHERE group_id=%s', (group_id,))
 
         @classmethod
         def add_group(cls, conn, group):
@@ -705,11 +612,12 @@ class Database:
             keys, values = zip(*data.items())
 
             query = 'INSERT INTO image_groups ({}) VALUES ({})'.format(
-                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
-
+                    ','.join(keys), ','.join(['%s' for _ in range(len(keys))]))
             logger.debug(query)
             logger.debug(values)
-            conn.execute(query, values)
+
+            with conn.cursor() as cursor:
+                cursor.execute(query, values)
 
             return group.group_id
 
@@ -718,21 +626,23 @@ class Database:
             query_args = []
             args = []
             for k in updates:
-                query_args.append('{}=?'.format(k))
+                query_args.append('{}=%s'.format(k))
                 args.append(updates[k])
             query = """
                 UPDATE image_groups
                 SET {}
-                WHERE group_id=?
+                WHERE group_id=%s
                 """.format(','.join(query_args))
 
             args.append(group_id)
-            conn.execute(query, args)
+            with conn.cursor() as cursor:
+                cursor.execute(query, args)
 
         @classmethod
         def list_groups(cls, conn):
-            cursor = conn.execute('SELECT group_id FROM image_groups')
-            return [row[0] for row in cursor]
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT group_id FROM image_groups')
+                return [row[0] for row in cursor]
 
         @classmethod
         def get_group(cls, conn, group_id):
@@ -745,11 +655,13 @@ class Database:
                 'description',
                 'permutations']
 
-            cursor = conn.execute("""
-                SELECT {}
-                FROM image_groups WHERE group_id=?""".format(','.join(fields)),
-                (group_id,))
-            row = cursor.fetchone()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT {}
+                    FROM image_groups WHERE group_id=%s""".format(','.join(fields)),
+                    (group_id,))
+                row = cursor.fetchone()
+
             row = {fields[i]: v for i, v in enumerate(row)}
             return row
 
@@ -777,63 +689,70 @@ class Database:
             keys, values = zip(*data.items())
 
             query = 'INSERT INTO sources ({}) VALUES ({})'.format(
-                    ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
-            conn.execute(query, values)
+                    ','.join(keys), ','.join(['%s' for _ in range(len(keys))]))
+
+            with conn.cursor() as cursor:
+                cursor.execute(query, values)
 
         @classmethod
         def get_source(cls, conn, source_id):
             fields = ['hash', 'updated', 'source_type']
 
-            cursor = conn.execute("""
-                SELECT {}
-                FROM sources WHERE source_id=?""".format(','.join(fields)),
-                (source_id,))
-            row = cursor.fetchone()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT {}
+                    FROM sources WHERE source_id=%s""".format(','.join(fields)),
+                    (source_id,))
+                row = cursor.fetchone()
+
             row = {fields[i]: v for i, v in enumerate(row)}
             return row
 
         @classmethod
         def source_exists(cls, conn, source_id):
-            cursor = conn.execute("""
-                SELECT source_id FROM sources
-                WHERE source_id=?""", (source_id,))
-            return cursor.fetchone() is not None
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT source_id FROM sources
+                    WHERE source_id=%s""", (source_id,))
+                return cursor.fetchone() is not None
 
         @classmethod
         def update_source(cls, conn, source_id, updates):
             query_args = []
             args = []
             for k in updates:
-                query_args.append('{}=?'.format(k))
+                query_args.append('{}=%s'.format(k))
                 args.append(updates[k])
             query = """
                 UPDATE sources
                 SET {}
-                WHERE source_id=?
+                WHERE source_id=%s
                 """.format(','.join(query_args))
 
             args.append(source_id)
-            conn.execute(query, args)
+
+            with conn.cursor() as cursor:
+                cursor.execute(query, args)
 
     class ImageWorker:
 
         @classmethod
         def next_id(cls, conn):
-            cursor = conn.execute('SELECT MAX(job_id) FROM workers')
-            last_id = cursor.fetchone()[0]
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT MAX(job_id) FROM workers')
+                last_id = cursor.fetchone()[0]
             if last_id is None:
                 return 0
             return last_id + 1
-
 
         @classmethod
         def add_jobs(cls, conn, jobs):
             query1 = """
                 INSERT INTO workers (job_id,job_type,job_status)
-                VALUES (?,?,?)
+                VALUES (%s,%s,%s)
             """
             query2 = """
-                INSERT INTO worker_images (job_id,image_id) VALUES (?,?)
+                INSERT INTO worker_images (job_id,image_id) VALUES (%s,%s)
             """
 
             print(jobs)
@@ -847,19 +766,21 @@ class Database:
                 print(job.__dict__)
                 print(next(job_iter()))
 
-            for arg1, arg2 in job_iter():
-                conn.execute(query1, arg1)
-                print(arg1, arg2)
-                conn.executemany(query2, arg2)
+            with conn.cursor() as cursor:
+                for arg1, arg2 in job_iter():
+                    cursor.execute(query1, arg1)
+                    print(arg1, arg2)
+                    cursor.executemany(query2, arg2)
 
         @classmethod
         def set_job_status(cls, conn, job_id, job_status):
             query = """
                 UPDATE workers
-                SET job_status=?
-                WHERE job_id=?
+                SET job_status=%s
+                WHERE job_id=%s
             """
-            conn.execute(query, (job_status, job_id))
+            with conn.cursor() as cursor:
+                cursor.execute(query, (job_status, job_id))
 
         @classmethod
         def get_job(cls, conn):
@@ -869,8 +790,9 @@ class Database:
                 WHERE job_status=0
                 LIMIT 1
             """
-            cursor = conn.execute(query)
-            row = cursor.fetchone()
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                row = cursor.fetchone()
 
             if row is not None:
                 fields = ['job_id', 'job_type', 'job_status']
@@ -893,7 +815,7 @@ class Database:
                 'images.fig_width',
                 'images.fig_rows',
                 'images.fig_cols',
-                'GROUP_CONCAT(image_subjects.subject_id)',
+                'ARRAY_AGG(image_subjects.subject_id)',
                 'image_groups.image_width',
                 'image_groups.group_type',
                 ])
@@ -909,20 +831,22 @@ class Database:
                     ON image_subjects.image_id=worker_images.image_id
                 INNER JOIN image_groups
                     ON image_groups.group_id=images.group_id
-                WHERE workers.job_id=?
+                WHERE workers.job_id=%s
                 GROUP BY worker_images.image_id
             """.format(fields=fields)
 
-            print(query)
-            cursor = conn.execute(query, (job_id,))
+            logger.info(query)
+            with conn.cursor() as cursor:
+                cursor.execute(query, (job_id,))
 
-            for row in cursor:
-                image = Database.Image._parse_image_row(row[:-2])
-                image_width = row[-2]
-                image_type = row[-1]
-                yield image, image_width, image_type
+                for row in cursor:
+                    image = Database.Image._parse_image_row(row[:-2])
+                    image_width = row[-2]
+                    image_type = row[-1]
+                    yield image, image_width, image_type
 
         @classmethod
         def clear_jobs(cls, conn):
-            conn.execute('DELETE FROM workers')
-            conn.execute('DELETE FROM worker_images')
+            with conn.cursor() as cursor:
+                cursor.execute('DELETE FROM workers')
+                cursor.execute('DELETE FROM worker_images')
