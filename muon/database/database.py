@@ -186,11 +186,12 @@ class Database:
                 FROM subjects as S
                 INNER JOIN image_subjects as I
                     ON I.subject_id=S.subject_id
-                WHERE I.image_id=?
+                WHERE I.image_id=%s
             """
-            cursor = conn.execute(query, (image_id,))
+            with conn.cursor() as cursor:
+                cursor.execute(query, (image_id,))
 
-            row = cursor.fetchone()
+                row = cursor.fetchone()
             return Subject(
                 id=row[0],
                 charge=np.fromstring(row[1], dtype=np.float32)
