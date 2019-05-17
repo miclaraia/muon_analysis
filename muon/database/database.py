@@ -262,6 +262,23 @@ class Database:
                 yield cls.get_subject(conn, subject_id)
 
         @classmethod
+        def get_image_subjects(cls, conn, image_id):
+            query = """
+                SELECT S.subject_id, S.charge
+                FROM subjects as S
+                INNER JOIN image_subjects as I
+                    ON I.subject_id=S.subject_id
+                WHERE I.image_id=?
+            """
+            cursor = conn.execute(query, (image_id,))
+
+            row = cursor.fetchone()
+            return Subject(
+                id=row[0],
+                charge=np.fromstring(row[1], dtype=np.float32)
+            )
+
+        @classmethod
         def get_all_subjects(cls, conn):
             cursor = conn.execute(
                 'SELECT subject_id, charge FROM subjects')
@@ -614,7 +631,7 @@ class Database:
                     ','.join(['?' for _ in range(len(batch))]))
                 query_ = query.replace(
                     'image_id=?', 'image_id IN {}'.format(query_sub))
-                print(query_)
+                logger.debug(query_)
                 cursor = conn.execute(query_, list(batch))
                 for row in cursor:
                     yield cls._parse_image_row(row)
@@ -689,6 +706,9 @@ class Database:
 
             query = 'INSERT INTO image_groups ({}) VALUES ({})'.format(
                     ','.join(keys), ','.join(['?' for _ in range(len(keys))]))
+
+            logger.debug(query)
+            logger.debug(values)
             conn.execute(query, values)
 
             return group.group_id
@@ -749,6 +769,7 @@ class Database:
         def add_source(cls, conn, source):
             data = {
                 'source_id': source.source_id,
+                'source_type': source.source_type,
                 'hash': source.hash,
                 'updated': source.updated,
             }
@@ -761,7 +782,7 @@ class Database:
 
         @classmethod
         def get_source(cls, conn, source_id):
-            fields = ['hash', 'updated']
+            fields = ['hash', 'updated', 'source_type']
 
             cursor = conn.execute("""
                 SELECT {}

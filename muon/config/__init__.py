@@ -24,6 +24,7 @@ class Config:
             if path is not None and os.path.isfile(path):
                 self.path = path
                 break
+        print(self.path)
 
         if self.path is None:
             raise FileNotFoundError('No valid config file found')
