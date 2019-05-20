@@ -5,9 +5,9 @@ CREATE TABLE IF NOT EXISTS images (
     metadata JSON NOT NULL,
     zoo_id INTEGER,
     fig_dpi INTEGER,
-    fig_offset INTEGER,
-    fig_height INTEGER,
-    fig_width INTEGER,
+    fig_offset DECIMAL(6,2),
+    fig_height DECIMAL(6,2),
+    fig_width DECIMAL(6,2),
     fig_rows INTEGER,
     fig_cols INTEGER
 );
@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS image_groups (
     image_size INTEGER,
     image_width INTEGER,
     description TEXT,
-    permutations INTEGER
+    permutations INTEGER,
+    zoo_subject_set INTEGER,
 );
 
 CREATE TABLE IF NOT EXISTS subjects (
@@ -72,7 +73,7 @@ CREATE TABLE IF NOT EXISTS sources (
 );
 
 CREATE TABLE IF NOT EXISTS workers (
-    job_id UUID PRIMARY KEY,
+    job_id INTEGER PRIMARY KEY,
     job_type TEXT,
     job_status INTEGER
 );

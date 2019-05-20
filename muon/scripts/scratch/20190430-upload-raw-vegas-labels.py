@@ -12,17 +12,17 @@ def get_existing_labels(conn, source):
         SELECT S.source_id, L.label
         FROM subjects as S
         INNER JOIN subject_labels as L
-            INDEXED BY subject_label
             ON L.subject_id=S.subject_id
-        WHERE S.source=?
-            AND L.label_name="vegas2"
+        WHERE S.source=%s
+            AND L.label_name='vegas2'
     """
 
     print(query)
-    cursor = conn.execute(query, (source,))
-    data = {}
-    for row in tqdm(cursor):
-        data[row[0]] = row[1]
+    with conn.cursor() as cursor:
+        cursor.execute(query, (source,))
+        data = {}
+        for row in tqdm(cursor):
+            data[row[0]] = row[1]
     return data
 
 
@@ -30,8 +30,8 @@ def insert_new_labels(conn, data):
     query = """
         INSERT INTO subject_labels (subject_id, label_name, label)
         VALUES (
-            (SELECT subject_id FROM subjects WHERE source_id=? LIMIT 1),
-            "vegas2",?);
+            (SELECT subject_id FROM subjects WHERE source_id=%s LIMIT 1),
+            'vegas2',%s);
     """
 
     def data_iter():
@@ -42,13 +42,13 @@ def insert_new_labels(conn, data):
         cursor.executemany(query, data_iter())
 
 
-def update_label(conn, source_id, label):
+def update_labels(conn, data):
     query = """
         UPDATE subject_labels as L
         INNER JOIN subjects as S
             ON S.subject_id=L.subject_id
-        SET L.label=?
-        WHERE S.source_id=? and L.label_name=?
+        SET L.label=%s
+        WHERE S.source_id=%s and L.label_name=%s
     """
 
     def data_iter():
@@ -95,19 +95,21 @@ def main(source_path, config):
         '92175.fits',
         '92185.fits',
         '92195.fits',
+        '92249.fits',
         ]
 
     with database.conn as conn:
         query = "SELECT source_id FROM sources"
         print(query)
-        cursor = conn.execute(query)
-        sources = []
-        # for row in cursor:
-            # if row[0] == 'SIMS140041.fits':
-                # sources.append(row[0])
-                # break
-        for row in cursor:
-            sources.append(row[0])
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            sources = []
+            # for row in cursor:
+                # if row[0] == 'SIMS140041.fits':
+                    # sources.append(row[0])
+                    # break
+            for row in cursor:
+                sources.append(row[0])
 
         # sources = ['SIMS150020.fits']
         print(sources)
@@ -139,16 +141,10 @@ def main(source_path, config):
                     elif existing_labels[id_] != label:
                         update.append((id_, label))
 
-            def tqdm_iter(data):
-                for item in tqdm():
-                    yield item
-
             print('Inserting')
-            for id_, label in tqdm(insert):
-                insert_new_label(conn, id_, label)
+            insert_new_labels(conn, insert)
             print('Updating')
-            for id_, label in tqdm(update):
-                update_label(conn, id_, label)
+            update_labels(conn, update)
             conn.commit()
 
 

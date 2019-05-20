@@ -30,11 +30,12 @@ from muon.images.image_group_single import SingleImageGroup
 def get_subjects(conn, num, groups):
     query = """
         CREATE TEMPORARY TABLE temp_muons (
-            subject_id TEXT PRIMARY KEY,
+            subject_id UUID PRIMARY KEY,
             rand INTEGER
         )
     """
-    conn.execute(query)
+    with conn.cursor() as cursor:
+        cursor.execute(query)
 
     query = """
         INSERT INTO temp_muons (subject_id, rand)
@@ -45,12 +46,13 @@ def get_subjects(conn, num, groups):
         WHERE
             S.split_id=1
             AND I.group_id IN ({})
-        GROUP BY I_S.subject_id
+        GROUP BY S.subject_id
         ;
     """.format(','.join(['%s' for _ in groups]))
 
     print(query)
-    conn.execute(query, tuple(groups))
+    with conn.cursor() as cursor:
+        cursor.execute(query, tuple(groups))
 
     # cursor = conn.execute('SELECT * from temp_muons LIMIT 50')
     # for row in cursor:
@@ -70,6 +72,8 @@ def get_subjects(conn, num, groups):
         for row in cursor:
             count += 1
             yield row[0]
+    print(count)
+    print(query)
 
     with conn.cursor() as cursor:
         cursor.execute(query, ('vegas_cleaned', 0, num//8,))
@@ -77,15 +81,18 @@ def get_subjects(conn, num, groups):
         for row in cursor:
             count += 1
             yield row[0]
+    print(count)
+    print(query)
 
     with conn.cursor() as cursor:
-        cursor.execute(query, ('vegas', 0, num - count,))
+        cursor.execute(query, ('vegas2', 0, num - count,))
 
         for row in cursor:
             count += 1
             if count > num:
                 break
             yield row[0]
+    print(count)
 
     query = "DROP TABLE temp_muons"
     with conn.cursor() as cursor:

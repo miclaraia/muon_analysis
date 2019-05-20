@@ -2,16 +2,11 @@ import click
 import pickle
 import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.debug(1)
-logger.info(2)
-logger.warn(3)
-
 from muon.database.database import Database
 from muon.project.parse_export import Aggregate
 from muon.config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class config:

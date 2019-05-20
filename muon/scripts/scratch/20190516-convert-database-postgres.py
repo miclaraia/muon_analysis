@@ -42,6 +42,10 @@ def main(sqlite_file):
         'image_subjects',
         'image_groups',
         'sources',
+        'subjects',
+        'subject_clusters',
+        'subject_labels',
+        'worker_images'
     ]
 
     for table in sorted(fields):
