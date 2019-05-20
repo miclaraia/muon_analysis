@@ -13,10 +13,17 @@ logger = logging.getLogger(__name__)
 class Uploader:
     _client = None
 
-    def __init__(self, project, group):
+    def __init__(self, project, group=None, subject_set=None):
         self.client()
         self.project = self.get_project(project)
-        self.subject_set = self.get_subject_set(group)
+
+        if subject_set is not None:
+            self.subject_set = SubjectSet.find(subject_set)
+        elif group is not None:
+            self.subject_set = self.get_subject_set(group)
+        else:
+            raise Exception('Must specify group id or subject_set')
+
         # self.subject_queue = []
 
     @classmethod

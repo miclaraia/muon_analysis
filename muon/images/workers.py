@@ -5,6 +5,7 @@ import numpy as np
 
 from muon.config import Config
 from muon.images.image import Image
+from muon.images.image_group import ImageGroup
 from muon.subjects.storage import Storage
 import muon.project.panoptes as panoptes
 
@@ -121,7 +122,7 @@ class Job:
                               dpi=dpi, path=image_path):
                 logger.info(image)
 
-    def upload(self, images):
+    def upload(self, images, database):
         config = Config.instance()
         image_path = config.storage.images
         project_id = config.panoptes.project_id
@@ -134,8 +135,17 @@ class Job:
                 continue
 
             group_id = image.group_id
+            group = ImageGroup(group_id, database)
             if group_id not in uploaders:
-                uploaders[group_id] = panoptes.Uploader(project_id, group_id)
+                uploader = panoptes.Uploader(
+                    project_id, group=group_id,
+                    subject_set=group.zoo_subject_set)
+
+                if group.zoo_subject_set is None:
+                    group.zoo_subject_set = uploader.subject_set.id
+                    group.save()
+                uploaders[group_id] = uploader
+
             uploader = uploaders[group_id]
 
             fname = os.path.join(
@@ -164,7 +174,7 @@ class Job:
                 yield image, image_width
 
         if self.job_type == 'upload':
-            self.upload(image_iter())
+            self.upload(image_iter(), database)
         elif self.job_type == 'generate':
             self.generate(image_iter(), database)
 

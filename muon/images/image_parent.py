@@ -184,6 +184,10 @@ class ImageParent(StorageObject):
         """
         Return the subject that should be at the given x,y coordinates
         """
+        logger.debug(self)
+        logger.debug(self.metadata)
+        logger.debug(self.image_meta)
+
         dpi = self.image_meta.dpi
         offset = self.image_meta.offset*dpi
         height = self.image_meta.height*dpi - offset
@@ -191,9 +195,6 @@ class ImageParent(StorageObject):
 
         rows = self.image_meta.rows
         cols = self.image_meta.cols
-
-        logger.debug(self.metadata)
-        logger.debug(self.image_meta)
 
         if 'beta_image' in self.metadata:
             # This image was generated before the offset bug was discovered

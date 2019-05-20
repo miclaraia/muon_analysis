@@ -61,6 +61,10 @@ class Config:
         return Storage(self.config)
 
     @property
+    def database(self):
+        return Database(self.config)
+
+    @property
     def loglevel(self):
         return self.config['general']['loglevel']
 

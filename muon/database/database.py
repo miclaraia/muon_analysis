@@ -16,12 +16,12 @@ class Database:
     def __init__(self, host=None, dbname=None, username=None, password=None):
         config = Config.instance().database
 
-        db_kwargs.update({
+        db_kwargs = {
             'host': config.host,
             'database': config.dbname,
             'username': config.username,
             'password': config.password
-        })
+        }
 
         db_update = {
             'host': host,
@@ -141,7 +141,7 @@ class Database:
                 row = cursor.fetchone()
             return Subject(
                 id=row[0],
-                charge=np.fromstring(row[1], dtype=np.float32)
+                charge=np.frombuffer(row[1], dtype=np.float32)
             )
 
         @classmethod
@@ -166,7 +166,7 @@ class Database:
                 for row in cursor:
                     yield Subject(
                         id=row[0],
-                        charge=np.fromstring(row[1], dtype=np.float32))
+                        charge=np.frombuffer(row[1], dtype=np.float32))
 
         @classmethod
         def get_subject_batches(cls, conn, batches):
@@ -194,7 +194,7 @@ class Database:
                 row = cursor.fetchone()
             return Subject(
                 id=row[0],
-                charge=np.fromstring(row[1], dtype=np.float32)
+                charge=np.frombuffer(row[1], dtype=np.float32)
             )
 
         @classmethod
@@ -205,7 +205,7 @@ class Database:
                 for row in cursor:
                     yield Subject(
                         id=row[0],
-                        charge=np.fromstring(row[1], dtype=np.float32)
+                        charge=np.frombuffer(row[1], dtype=np.float32)
                     )
 
         @classmethod
@@ -443,8 +443,8 @@ class Database:
             for field in kwargs:
                 if 'fig_' in field:
                     fig_attrs[field[4:]] = kwargs[field]
-                elif field == 'metadata':
-                    image_attrs[field] = json.loads(kwargs[field])
+                # elif field == 'metadata':
+                    # image_attrs[field] = json.loads(kwargs[field])
                 else:
                     image_attrs[field] = kwargs[field]
 
@@ -608,7 +608,8 @@ class Database:
                 'image_size': group.image_size,
                 'image_width': group.image_width,
                 'description': group.description,
-                'permutations': group.permutations
+                'permutations': group.permutations,
+                'zoo_subject_set': group.zoo_subject_set,
             }
             keys, values = zip(*data.items())
 
@@ -654,7 +655,9 @@ class Database:
                 'image_size',
                 'image_width',
                 'description',
-                'permutations']
+                'permutations',
+                'zoo_subject_set',
+            ]
 
             with conn.cursor() as cursor:
                 cursor.execute("""
@@ -816,7 +819,7 @@ class Database:
                 'images.fig_width',
                 'images.fig_rows',
                 'images.fig_cols',
-                'ARRAY_AGG(image_subjects.subject_id)',
+                't2.subject_ids',
                 'image_groups.image_width',
                 'image_groups.group_type',
                 ])
@@ -826,6 +829,11 @@ class Database:
                 FROM workers
                 INNER JOIN worker_images
                     ON workers.job_id=worker_images.job_id
+                INNER JOIN (
+                    SELECT image_id, ARRAY_AGG(subject_id) as subject_ids
+                    FROM image_subjects
+                    GROUP BY image_id
+                ) AS t2 ON t2.image_id=worker_images.image_id
                 INNER JOIN images
                     ON images.image_id=worker_images.image_id
                 INNER JOIN image_subjects
@@ -833,7 +841,6 @@ class Database:
                 INNER JOIN image_groups
                     ON image_groups.group_id=images.group_id
                 WHERE workers.job_id=%s
-                GROUP BY worker_images.image_id
             """.format(fields=fields)
 
             logger.info(query)
@@ -841,6 +848,12 @@ class Database:
                 cursor.execute(query, (job_id,))
 
                 for row in cursor:
+                    logger.debug(row)
+                    logger.debug(row[:-3])
+                    logger.debug(type(row[:-3]))
+
+                    row = list(row)
+                    row[11] = row[11][1:-1].split(',')
                     image = Database.Image._parse_image_row(row[:-2])
                     image_width = row[-2]
                     image_type = row[-1]

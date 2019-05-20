@@ -15,12 +15,12 @@ def cli():
     pass
 
 
-def check(zoo_subjects, group, database, uploader, destructive):
+def check(zoo_subjects, image_group, database, uploader, destructive):
     images = set()
     unlink = []
     set_zooid = 0
 
-    image_group = ImageGroup.load(group, database)
+    # image_group = ImageGroup.load(group, database)
     image_group.images.load_all()
     for zoo_id, image_id in tqdm(zoo_subjects):
         # image = Image(image_id, database, online=destructive)
@@ -38,6 +38,7 @@ def check(zoo_subjects, group, database, uploader, destructive):
                 image.zoo_id = zoo_id
 
 
+    print(images)
     reset_zooid = 0
     print('Resetting image zooids')
     # group = ImageGroup(group, database, online=destructive)
@@ -60,9 +61,17 @@ def check(zoo_subjects, group, database, uploader, destructive):
 @click.option('--group', type=int, required=True)
 @click.option('--destructive', is_flag=True)
 def online(config, group, destructive):
+    group_id = group
     Config.new(config)
     database = Database()
-    uploader = Uploader(5918, group)
+    config = Config.instance()
+
+    project_id = config.panoptes.project_id
+    group = ImageGroup(group_id, database, online=destructive)
+
+    uploader = Uploader(
+        project_id, group=group_id,
+        subject_set=group.zoo_subject_set)
 
     def zoo_subjects():
         for subject in uploader.get_subjects():
@@ -77,9 +86,17 @@ def online(config, group, destructive):
 @click.option('--group', type=int, required=True)
 @click.option('--destructive', is_flag=True)
 def from_export(config, subject_export, group, destructive):
+    group_id = group
     Config.new(config)
     database = Database()
-    uploader = Uploader(5918, group)
+    config = Config.instance()
+
+    project_id = config.panoptes.project_id
+    group = ImageGroup(group_id, database, online=destructive)
+
+    uploader = Uploader(
+        project_id, group=group_id,
+        subject_set=group.zoo_subject_set)
 
     def zoo_subjects():
         with open(subject_export, 'r') as f:
@@ -87,9 +104,9 @@ def from_export(config, subject_export, group, destructive):
                 zoo_id = int(row['subject_id'])
                 metadata = json.loads(row['metadata'])
                 image_id = metadata['id']
-                group_id = metadata['#group']
+                group_id2 = metadata['#group']
 
-                if group_id == group:
+                if group_id2 == group_id:
                     yield zoo_id, image_id
 
     check(zoo_subjects(), group, database, uploader, destructive)

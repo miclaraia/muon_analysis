@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class ImageGroupParent(StorageObject):
 
     image_count = StorageAttribute('image_count')
+    zoo_subject_set = StorageAttribute('zoo_subject_set')
     TYPES = TYPES
 
     def __init__(self, group_id, database, attrs=None, online=False):
@@ -31,6 +32,7 @@ class ImageGroupParent(StorageObject):
             width
             description
             permutations
+            zoo_subject_set
         """
 
         super().__init__(database, online)
@@ -45,9 +47,11 @@ class ImageGroupParent(StorageObject):
         self.description = attrs['description']
         self.permutations = attrs['permutations']
         self.cluster_name = attrs['cluster_name']
-        
+
         self.storage = {s.name: s for s in [
-            StoredAttribute('image_count', attrs['image_count'])]}
+            StoredAttribute('image_count', attrs['image_count']),
+            StoredAttribute('zoo_subject_set', attrs['zoo_subject_set']),
+            ]}
 
         self.images = ImageLoader(group_id, self.image_count, database,
                                   self.group_type, online)
@@ -81,7 +85,8 @@ class ImageGroupParent(StorageObject):
             'description': description,
             'permutations': permutations,
             'cluster_name': cluster_name,
-            'image_count': 0
+            'image_count': 0,
+            'zoo_subject_set': None
         }
 
         group = cls(group_id, database, attrs=attrs)
@@ -122,9 +127,10 @@ class ImageGroupParent(StorageObject):
         }
 
     def __str__(self):
-        s = 'group {} cluster_name {} images {} metadata {}'.format(
-            self.group_id, self.cluster_name,
-            self.image_count, self.metadata())
+        s = 'group {} cluster_name {} images {} metadata {} ' \
+            'subject_set {}'.format(
+                self.group_id, self.cluster_name,
+                self.image_count, self.metadata(), self.zoo_subject_set)
         return s
 
     def __repr__(self):
@@ -138,7 +144,12 @@ class ImageGroupParent(StorageObject):
         image_path = config.storage.images
         project_id = config.panoptes.project_id
 
-        uploader = panoptes.Uploader(project_id, self.group_id)
+        uploader = panoptes.Uploader(
+            project_id, group=self.group_id, subject_set=self.zoo_subject_set)
+
+        if self.zoo_subject_set is None:
+            self.zoo_subject_set = int(uploader.subject_set.id)
+            self.save()
 
         if existing_subjects:
             images = self.images
