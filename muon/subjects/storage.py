@@ -124,7 +124,7 @@ class Storage:
 
             return Subjects(subjects)
 
-    def get_split_subjects(self, split_name, batches=None):
+    def get_split_by_batch(self, split_name, batches=None):
         with self.conn as conn:
             if batches:
                 subject_ids = self.database.Subject \
@@ -134,6 +134,15 @@ class Storage:
                     .get_split_subjects(conn, split_name)
 
             return self.get_subjects(subject_ids)
+
+    def get_split_by_group(self, split_name, groups, label_name=None):
+        with self.conn as conn:
+            if label_name:
+                return self.database.Subject \
+                    .get_subjects_labels_by_split_group(
+                        conn, split_name, label_name, groups)
+            return self.database.Subject \
+                .get_subjects_by_split_group(conn, split_name, groups)
 
     def get_subject_labels(self, subject_ids):
         with self.conn as conn:

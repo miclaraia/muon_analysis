@@ -45,6 +45,7 @@ def main(name, save_dir, config, batches):
         raise FileExistsError('save_dir already exists!')
     os.mkdir(save_dir)
     config = Config(**config_args)
+    config.batches = batches
     config.dump()
 
     if batches:

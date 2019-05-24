@@ -5,6 +5,7 @@ from tqdm import tqdm
 import logging
 
 from redec_keras.models.decv2 import DECv2, Config
+import redec_keras.models.multitask as multitask
 
 SPLITS = {k: i for i, k in enumerate(['train', 'test', 'valid', 'train_dev'])}
 logger = logging.getLogger(__name__)
@@ -26,12 +27,35 @@ class Clustering:
             (np.zeros(no_shape), None))
 
     @classmethod
-    def train_multitask(cls, config, subject_storage):
-        pass
+    def train_multitask(cls, source_dir, save_dir,
+                        config_args, label_name, subject_storage):
+        logger.info('Multitask')
+
+        config_args = {
+            'maxiter': 80,
+            'gamma': 1.0,
+            'splits': None
+        }.update(config_args)
+
+        config = multitask.Config.new(source_dir, save_dir, **config_args)
+        config.dump()
+
+        dec = MultitaskDEC(config, x_train.shape)
+        dec.init(x_train)
 
     @classmethod
     def train_redec(cls, config, subject_storage):
         pass
+
+    # @classmethod
+    # def get_splits_with_labels(cls, subject_storage, label_name, groups):
+        # splits = {
+            # 'train': subject_storage.get_split_by_group('train', groups)
+            # 'train': subject_storage.get_split_by_group('train', groups)
+            # 'train': subject_storage.get_split_by_group('train', groups)
+            # 'train': subject_storage.get_split_by_group('train', groups)
+            # 'test': 
+        # }
 
     @classmethod
     def assign_clusters(cls, config, subject_storage, cluster_name,
