@@ -24,9 +24,17 @@ class AggregationAnalysis:
         agg = Aggregate(None, None)
         agg.images = data['images']
         agg.subjects = data['subjects']
+        agg.swap = data['swap']
 
         self.agg = agg
         self._labels = None
+        self._majority = None
+        self._swap = None
+        self._first = None
+        self._np_labels = None
+
+        self._subjects = None
+
         self._metrics = None
         self._cleaned = cleaned
 
@@ -34,8 +42,9 @@ class AggregationAnalysis:
         agg = self.agg
         n_subjects = np.sum([len(agg.subjects[s]) for s in agg.subjects])
         n_grids = np.sum([len(agg.images[s]) for s in agg.images])
-        metrics = self.metrics
+        metrics = dict(self.flatten_metrics)
         print(metrics)
+        print('Measuring on {} subjects'.format(len(self.subjects)))
 
         labels = []
         data = []
@@ -43,9 +52,9 @@ class AggregationAnalysis:
         labels += ['n_subjects', 'n_grids']
         data += [n_subjects, n_grids]
 
-        metric_k = list(sorted(metrics.keys()))
-        labels += metric_k
-        data += ['{:.3f}'.format(metrics[k]) for k in metric_k]
+        k = list(sorted(metrics))
+        labels += k
+        data += ['{:.3f}'.format(metrics[k]) for k in k]
         return DataFrame(data, index=labels)
 
     def plot_n_grid(self, ax):
@@ -67,27 +76,54 @@ class AggregationAnalysis:
         logger.info('Loading labels')
 
         query = """
-            SELECT subject_labels.subject_id, subject_labels.label
-            FROM subject_labels
-            INNER JOIN image_subjects
-                ON image_subjects.subject_id=subject_labels.subject_id
-            WHERE image_subjects.group_id=13
-                AND subject_labels.label_name=?
+            SELECT L.subject_id, L.label
+            FROM subject_labels as L
+            INNER JOIN image_subjects AS SI
+                ON SI.subject_id=L.subject_id
+            INNER JOIN images AS I
+                ON I.image_id=SI.image_id
+            WHERE I.group_id IN (10,11,12,13)
+                AND (L.label_name='vegas_cleaned')
         """
 
         labels = {}
+        with database.conn as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                for subject_id, label in tqdm(cursor):
+                    if subject_id in self.agg.subjects:
+                        labels[subject_id] = label
 
-        if self._cleaned:
-            label_name = 'vegas_cleaned'
-        else:
-            label_name = 'vegas'
+        return labels
+
+    def load_majority_labels(self, subjects):
+        logger.info('Loading majority labels')
+        labels = {s: n>0.5 for s, n in tqdm(self.agg.reduce_subjects())}
+        labels = {s: labels[s] for s in subjects}
+        return labels
+
+    def load_swap_labels(self, subjects):
+        logger.info('Loading swap labels')
+        labels = {s: n>0.5 for s, n in self.agg.swap.items()}
+        labels = {s: labels[s] for s in subjects}
+        return labels
+
+    def load_first_label(self, subjects):
+        logger.info('Loading first label')
+        labels = {s: self.agg.subjects[s][0] for s in subjects}
+        return labels
+
+
+
+            
+
+
+        # if self._cleaned:
+            # label_name = 'vegas_cleaned'
+        # else:
+            # label_name = 'vegas'
 
         reduced_subjects = {s: n for s, n in tqdm(self.agg.reduce_subjects())}
-        with database.conn as conn:
-            cursor = conn.execute(query, (label_name,))
-            for subject_id, label in tqdm(cursor):
-                if subject_id in reduced_subjects:
-                    labels[subject_id] = label
 
         np_labels = [(labels[s], reduced_subjects[s] > 0.5) for s in labels]
         np_labels = np.array(np_labels).astype(np.int)
@@ -98,22 +134,56 @@ class AggregationAnalysis:
     def labels(self):
         if self._labels is None:
             self._labels = self.load_labels()
-        return self._labels[0]
+        return self._labels
+
+    @property
+    def majority(self):
+        if self._majority is None:
+            self._majority = self.load_majority_labels(self.subjects)
+        return self._majority
+
+    @property
+    def swap(self):
+        if self._swap is None:
+            self._swap = self.load_swap_labels(self.subjects)
+        return self._swap
+
+    @property
+    def first_vote(self):
+        if self._first is None:
+            self._first = self.load_first_label(self.subjects)
+        return self._first
+
+    @property
+    def subjects(self):
+        if self._subjects is None:
+            labeled = set(self.labels)
+            subjects = self.agg.subjects
+            subjects = set([s for s in subjects if len(subjects[s]) >= 5])
+
+            self._subjects = labeled & subjects
+        return self._subjects
 
     @property
     def np_labels(self):
-        if self._labels is None:
-            self._labels = self.load_labels()
-        return self._labels[1]
+        if self._np_labels is None:
+            subjects = list(self.subjects)
+            data = []
+            for s in subjects:
+                data.append(
+                    (self.labels[s], self.majority[s],
+                     self.swap[s], self.first_vote[s]))
+            self._np_labels = np.array(data)
+        return self._np_labels
 
-    def _accuracy(self):
+    def _accuracy(self, index):
         labels = self.np_labels
-        accuracy = np.sum(labels[:,0] == labels[:,1]) / labels.shape[0]
+        accuracy = np.sum(labels[:,0] == labels[:,index]) / labels.shape[0]
         return accuracy
 
-    def _f1(self):
+    def _f1(self, index):
         labels = self.np_labels
-        f1 = sklearn.metrics.f1_score(labels[:,0], labels[:,1])
+        f1 = sklearn.metrics.f1_score(labels[:,0], labels[:,index])
         return f1
 
     def _f1_benchmarks(self):
@@ -130,18 +200,57 @@ class AggregationAnalysis:
     @property
     def metrics(self):
         if self._metrics is None:
-            self._metrics = {
-                'accuracy': self._accuracy(),
-                'f1': self._f1(),
-                **{'f1_{}'.format(k): v for k, v in
-                    self._f1_benchmarks().items()}
-            }
+            metrics = {}
+            for k, i in [('majority', 1), ('swap', 2), ('first', 3)]:
+                metrics[k] = {
+                    'accuracy': self._accuracy(i),
+                    'f1': self._f1(i),
+                }
+            metrics['benchmarks'] = self._f1_benchmarks()
+            self._metrics = metrics
         return self._metrics
 
-    def plot_metrics(self, ax):
+    @property
+    def flatten_metrics(self):
         metrics = self.metrics
-        x = [metrics[k] for k in ['accuracy', 'f1', 'f1_ones']]
-        labels = ['Accuracy', 'F1 Score', 'F1 Benchmark (all ones)']
+        for i in metrics:
+            for j in metrics[i]:
+                yield '{}_{}'.format(j, i), metrics[i][j]
+
+    def plot_summary(self):
+        fig = plt.figure(figsize=(12,4))
+        fig.subplots_adjust(wspace=0.35)
+
+        ax = fig.add_subplot(121)
+        self.plot_n_subjects(ax)
+        ax = fig.add_subplot(122)
+        self.plot_n_grid(ax)
+        plt.show()
+
+        fig = plt.figure(figsize=(12,4))
+        fig.subplots_adjust(wspace=0.3)
+        ax = fig.add_subplot(121)
+        self.plot_n_subjects(ax)
+        ax.set_yscale('log')
+        ax = fig.add_subplot(122)
+        self.plot_n_grid(ax)
+        ax.set_yscale('log')
+        plt.show()
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        self.plot_metrics(ax, 'majority')
+        plt.show()
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        self.plot_data_breakdown(ax)
+        plt.show()
+
+    def plot_metrics(self, ax, key):
+        metrics = dict(self.flatten_metrics)
+        x = [(k, metrics[k]) for k in sorted(metrics)]
+        labels, x = zip(*x)
 
         plt.barh(labels, x)
         for i, j in enumerate(x):

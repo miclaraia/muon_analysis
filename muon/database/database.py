@@ -4,6 +4,7 @@ import numpy as np
 import json
 from tqdm import tqdm
 import logging
+import decimal
 
 from muon.subjects.subject import Subject
 from muon.config import Config
@@ -41,7 +42,7 @@ class Database:
 
     def create_db(self):
         fname = os.path.dirname(__file__)
-        fname = os.path.join(fname, 'schema_postgres.sql')
+        fname = os.path.join(fname, 'schema-pg.sql')
         with open(fname, 'r') as f:
             query = f.read()
 
@@ -79,7 +80,7 @@ class Database:
 
     class Subject:
         _splits = {k: i for i, k in
-                   enumerate(['train', 'test', 'valid', 'train_dev'])}
+                   enumerate(['train', 'test', 'valid', 'train_dev', None])}
 
         @classmethod
         def next_batch(cls, conn):
@@ -279,6 +280,53 @@ class Database:
                     yield row[0]
 
         @classmethod
+        def get_subjects_by_split_group(
+                cls, conn, split_name, image_groups):
+            query = """
+                SELECT S.subject_id, S.charge, L.label FROM subjects
+                INNER JOIN image_subjects AS SI
+                    ON SI.subject_id=S.subject_id
+                INNER JOIN images AS I
+                    ON I.image_id=SI.image_id
+                WHERE I.group_id IN %s
+                    AND S.split_id=%s
+            """
+
+            split_id = cls._splits[split_name]
+            args = (tuple(image_groups), split_id)
+            with conn.cursor() as cursor:
+                cursor.execute(query, args)
+                for row in cursor:
+                    yield Subject(
+                        id=row[0],
+                        charge=np.frombuffer(row[1], dtype=np.float32))
+        @classmethod
+        def get_subjects_labels_by_split_group(
+                cls, conn, split_name, label_name, image_groups):
+            query = """
+                SELECT S.subject_id, S.charge, L.label FROM subjects
+                INNER JOIN image_subjects AS SI
+                    ON SI.subject_id=S.subject_id
+                INNER JOIN images AS I
+                    ON I.image_id=SI.image_id
+                INNER JOIN subject_labels AS L
+                    ON L.subject_id=S.subject_id
+                WHERE I.group_id IN %s
+                    AND S.split_id=%s
+                    AND L.label_name=%s
+            """
+
+            split_id = cls._splits[split_name]
+            args = (tuple(image_groups), split_id, label_name)
+            with conn.cursor() as cursor:
+                cursor.execute(query, args)
+                for row in cursor:
+                    yield Subject(
+                        id=row[0],
+                        charge=np.frombuffer(row[1], dtype=np.float32),
+                        label=row[2])
+
+        @classmethod
         def get_split_subjects_batches(cls, conn, split_name, batches):
             for batch in batches:
                 for row in cls.get_split_subjects_batch(
@@ -442,7 +490,10 @@ class Database:
             fig_attrs = {}
             for field in kwargs:
                 if 'fig_' in field:
-                    fig_attrs[field[4:]] = kwargs[field]
+                    item = kwargs[field]
+                    if type(item) is decimal.Decimal:
+                        item = float(item)
+                    fig_attrs[field[4:]] = item
                 # elif field == 'metadata':
                     # image_attrs[field] = json.loads(kwargs[field])
                 else:
@@ -481,7 +532,7 @@ class Database:
                 'fig_width',
                 'fig_rows',
                 'fig_cols',
-                'ARRAY_AGG(image_subjects.subject_id)'
+                'ARRAY_AGG(image_subjects.subject_id)::text[]'
                 ])
 
             query = """
@@ -678,6 +729,21 @@ class Database:
                 # permutations=group[5],
                 # images=None)
 
+        @classmethod
+        def get_groups_subject_labels(cls, conn, label_name, groups):
+            query = """
+                SELECT SI.subject_id, L.label
+                FROM image_subjects as SI
+                INNER JOIN images as I
+                    ON I.image_id=SI.image_id
+                INNER JOIN subject_labels as L
+                    ON L.subject_id=SI.subject_id
+                WHERE L.label_name=%s and I.group_id IN %s
+            """
+            with conn.cursor() as cursor:
+                cursor.execute(query, (label_name, groups))
+                for row in cursor:
+                    yield row
 
     class Source:
 
@@ -830,7 +896,8 @@ class Database:
                 INNER JOIN worker_images
                     ON workers.job_id=worker_images.job_id
                 INNER JOIN (
-                    SELECT image_id, ARRAY_AGG(subject_id) as subject_ids
+                    SELECT image_id, ARRAY_AGG(subject_id)::text[]
+                        as subject_ids
                     FROM image_subjects
                     GROUP BY image_id
                 ) AS t2 ON t2.image_id=worker_images.image_id
@@ -852,8 +919,8 @@ class Database:
                     logger.debug(row[:-3])
                     logger.debug(type(row[:-3]))
 
-                    row = list(row)
-                    row[11] = row[11][1:-1].split(',')
+                    # row = list(row)
+                    # row[11] = row[11][1:-1].split(',')
                     image = Database.Image._parse_image_row(row[:-2])
                     image_width = row[-2]
                     image_type = row[-1]

@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS image_groups (
     image_width INTEGER,
     description TEXT,
     permutations INTEGER,
-    zoo_subject_set INTEGER,
+    zoo_subject_set INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS subjects (
@@ -54,10 +54,10 @@ CREATE TABLE IF NOT EXISTS subject_clusters (
 CREATE TABLE IF NOT EXISTS subject_labels (
     subject_id UUID NOT NULL,
     label_name TEXT NOT NULL,
-    label INTEGER NOT NULL
+    label INTEGER NOT NULL,
+    UNIQUE (label_name, subject_id);
     )
     -- PARTITION BY LIST (label_name)
-    UNIQUE (label_name, subject_id);
 
 -- CREATE TABLE IF NOT EXISTS subject_labels_vegas
     -- PARITITON OF subject_labels FOR VALUES IN ('vegas');
@@ -112,8 +112,8 @@ CREATE INDEX IF NOT EXISTS id_cluster
 
 /* ** Subject Labels ***************************** */
 
-CREATE INDEX IF NOT EXISTS subject_labels
-    ON subject_labels (label, subject_id);
+-- CREATE INDEX IF NOT EXISTS subject_labels
+    -- ON subject_labels (label, subject_id);
 CREATE INDEX IF NOT EXISTS subject_label_id
     ON subject_labels (subject_id);
 

@@ -29,16 +29,20 @@ class config:
 
 @click.group(invoke_without_command=True)
 @click.option('--config')
+@click.option('--swap', is_flag=True)
 @click.argument('export_file')
 @click.argument('out_file')
-def main(config, export_file, out_file):
+def main(config, swap, export_file, out_file):
     config = Config.new(config)
     database = Database()
 
-    agg = Aggregate(config.classification, database)
+    agg = Aggregate(database, config.classification, swap=swap)
     agg.aggregate(export_file)
 
-    data = {'subjects': agg.subjects, 'images': agg.images}
+    data = {'subjects': agg.subjects, 'images': agg.images, 'swap': agg.swap}
+
+    import code
+    code.interact(local={**globals(), **locals()})
 
     with open(out_file, 'wb') as f:
         pickle.dump(data, f)

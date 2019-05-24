@@ -10,22 +10,36 @@ import numpy as np
 from muon.images.image import Image
 from muon.images.image_group import ImageGroup
 
+from swap.utils.control import SWAP
+from swap.utils.config import Config as SwapConfig
+
 logger = logging.getLogger(__name__)
 
 
 class Aggregate:
-    def __init__(self, database, config):
+    def __init__(self, database, config, swap=False):
         self.database = database
         self.config = config
 
         self.images = {}
         self.subjects = {}
+        self.swap = {}
+        if swap:
+            self._swap = SWAP(SwapConfig('mh2'))
+            groups = tuple(config.image_groups)
+            with database.conn as conn:
+                golds = database.ImageGroup \
+                    .get_groups_subject_labels(conn, 'vegas_cleaned', groups)
+                self._swap.apply_golds(golds)
+        else:
+            self._swap = None
 
     def aggregate(self, fname):
 
-        parser = Parse(self.config, self.database)
+        parser = Parse(self.database, self.config)
 
-        for image, n_total, choice, coords in parser.parse(fname):
+        logger.info('Starting aggregating classifications')
+        for user_id, image, n_total, choice, coords in parser.parse(fname):
             clicked_subjects = self._clicked_subjects(image, coords)
             classification = self._image_classification(
                 image, clicked_subjects)
@@ -33,25 +47,32 @@ class Aggregate:
             if choice == 'all_muons':
                 classification = np.ones_like(classification)
                 self._annotate_image(image, classification)
-                self._annotate_subjects(image, classification)
+                self._annotate_subjects(user_id, image, classification)
 
             elif choice == 'no_muons':
                 classification = np.zeros_like(classification)
                 self._annotate_image(image, classification)
-                self._annotate_subjects(image, classification)
+                self._annotate_subjects(user_id, image, classification)
 
             elif choice == 'most_muons':
                 classification = 1-classification
                 self._annotate_image(image, classification)
-                self._annotate_subjects(image, classification)
+                self._annotate_subjects(user_id, image, classification)
 
             elif choice == 'most_nonmuons':
                 self._annotate_image(image, classification)
-                self._annotate_subjects(image, classification)
+                self._annotate_subjects(user_id, image, classification)
 
             else:
                 print(choice, image)
                 raise Exception
+        logger.info('Done aggregating')
+
+        if self._swap is not None:
+            logger.info('running swap')
+            self._swap()
+            for s, v in tqdm(self.reduce_swap()):
+                self.swap[s] = v
 
     def _annotate_image(self, image, classification):
         image_id = image.image_id
@@ -59,11 +80,14 @@ class Aggregate:
             self.images[image_id] = []
         self.images[image_id].append(classification)
 
-    def _annotate_subjects(self, image, classification):
+    def _annotate_subjects(self, user_id, image, classification):
         for i in np.arange(classification.shape[0]):
             subject_id = image.subjects[i]
             annotation = classification[i]
             self._annotate_subject(subject_id, annotation)
+
+            if self._swap is not None:
+                self._swap.classify(user_id, subject_id, annotation, 0)
 
     def _annotate_subject(self, subject_id, annotation):
         if subject_id not in self.subjects:
@@ -92,10 +116,14 @@ class Aggregate:
             # n, t, _ = zip(*self.images[image_id])
             # yield image_id, sum(n) / sum(t)
 
-    # def reduce_subjects(self):
-        # for subject_id in sorted(self.subjects):
-            # v = self.subjects[subject_id]
-            # yield subject_id, sum(v)/len(v)
+    def reduce_subjects(self):
+        for subject_id in sorted(self.subjects):
+            v = self.subjects[subject_id]
+            yield subject_id, sum(v)/len(v)
+
+    def reduce_swap(self):
+        for s in self._swap.subjects.iter():
+            yield s.id, s.score
 
     # def dump_images(self, fname):
         # with open(fname, 'w') as f:
@@ -136,6 +164,7 @@ class Parse:
             for row in tqdm(reader):
                 try:
                     annotations = json.loads(row['annotations'])
+                    user_id = row['user_id']
                     zoo_id = row['subject_ids']
                     subject_metadata = json.loads(row['subject_data'])[zoo_id]
 
@@ -154,11 +183,12 @@ class Parse:
                         image = image_groups[group_id].images[image_id]
                         image_size = image_groups[group_id].image_size
 
-                        yield image, image_size, choice, coords
+                        yield user_id, image, image_size, choice, coords
                 except Exception as e:
                     logger.exception(e)
                     print(zoo_id, subject_metadata)
                     continue
+        logger.info('Done parsing file')
 
     def parse_choice(self, annotations):
         def choice_map(choice):
@@ -186,3 +216,16 @@ class Parse:
             group = int(subject_metadata['#group'])
             return (time > launch_date) and (group in self.config.image_groups)
         return False
+
+
+class RunSWAP:
+
+    def __init__(self):
+        config = SwapConfig('mh2')
+        self.swap = SWAP(config)
+
+    def apply_golds(self, golds):
+        self.swap.apply_golds(golds)
+
+    def classify(self, subject_id, user, cl):
+        pass
