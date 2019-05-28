@@ -19,7 +19,7 @@ def insert_iter(agg_file, label_name):
         if len(data[s]) > 5:
             count += 1
             v = sum(data[s]) / len(data[s])
-            yield s, labele_name, v
+            yield s, label_name, v
     print(count)
 
 
