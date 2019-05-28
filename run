@@ -7,18 +7,27 @@ THIS="$(readlink -f ${BASH_SOURCE[0]})"
 cd ${HERE}
 
 upload () {
+
+    cat > /tmp/muon-upload-files.txt << EOF
+muon/muon
+muon/setup.py
+muon/muon.env
+redec-keras/redec_keras
+EOF
+
     rsync -rpv \
         --exclude="__pycache__" \
         --exclude="*.pkl" \
         --exclude="*.csv" \
         --exclude="*.json" \
-        muon zoo:/home/larai002/Zooniverse/repos/muon/
+        --exclude="venv" \
+        --exclude=".git" \
+        --files-from="/tmp/muon-upload-files.txt" \
+        $ZOO zoo:/home/larai002/Zooniverse/repos
+
     rsync -rcv \
         muon/scripts/models/decv2/*.csv \
         zoo:/home/larai002/Zooniverse/repos/muon/muon/scripts/models/decv2
-
-    rsync setup.py zoo:/home/larai002/Zooniverse/repos/muon
-    rsync muon.env zoo:/home/larai002/Zooniverse/repos/muon
 
     rsync -rpv \
         --exclude="venv" \
@@ -27,7 +36,8 @@ upload () {
         --exclude="*.csv" \
         --exclude="*.json" \
         --exclude=".git" \
-        ${ZOO}/redec-keras zoo:/home/larai002/Zooniverse/repos
+        --exclude="*.sqlite" \
+        ${ZOO}/swap zoo:/home/larai002/Zooniverse/repos
 }
 
 desktop () {
