@@ -10,25 +10,25 @@ the MH2 project.
 |====================|========================================================|
 | Name               | Description                                            |
 |====================|========================================================|
-| `image_groups`     |                                                        |
+|  image_groups      |                                                        |
 |--------------------|--------------------------------------------------------|
-| `image_subjects`   | defines which subjects are in an image                 |
+|  image_subjects    | defines which subjects are in an image                 |
 |--------------------|--------------------------------------------------------|
-| `images`           |                                                        |
+|  images            |                                                        |
 |--------------------|--------------------------------------------------------|
-| `sources`          | keeps track of the source files used to generate the db|
+|  sources           | keeps track of the source files used to generate the db|
 |--------------------|--------------------------------------------------------|
-| `subject_clusters` | record of which cluster a subject belongs to           |
+|  subject_clusters  | record of which cluster a subject belongs to           |
 |--------------------|--------------------------------------------------------|
-| `subject_labels`   | records of labels for a subject. Each subject can have |
+|  subject_labels    | records of labels for a subject. Each subject can have |
 |                    | multiple labels from different sources (like vegas,    |
 |                    | volunteer, etc)                                        |
 |--------------------|--------------------------------------------------------|
-| `subjects`         | each subject. includes a binary numpy array of pixel   |
+|  subjects          | each subject. includes a binary numpy array of pixel   |
 |                    | data                                                   |
 |--------------------|--------------------------------------------------------|
-| `worker_images`    | workers for parallelizing image generation and upload  |
-| `workers`          |                                                        |
+|  worker_images     | workers for parallelizing image generation and upload  |
+|  workers           |                                                        |
 |--------------------|--------------------------------------------------------|
 ```
 
