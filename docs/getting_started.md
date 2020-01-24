@@ -6,7 +6,10 @@ A subject is one of the individual detections. An image is a grid that is
 uploaded to the MH2 project. An image-group is a batch of images uploaded to
 the MH2 project.
 
-|--------------------|--------------------------------------------------------|
+```
+|====================|========================================================|
+| Name               | Description                                            |
+|====================|========================================================|
 | `image_groups`     |                                                        |
 |--------------------|--------------------------------------------------------|
 | `image_subjects`   | defines which subjects are in an image                 |
@@ -27,6 +30,7 @@ the MH2 project.
 | `worker_images`    | workers for parallelizing image generation and upload  |
 | `workers`          |                                                        |
 |--------------------|--------------------------------------------------------|
+```
 
 `scripts/scratch/20190503-dump-training-images.py` a script that you could use
 as a guide. This may be the script I used to generate some images for Kevin
